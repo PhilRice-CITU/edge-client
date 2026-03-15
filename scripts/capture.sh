@@ -1,0 +1,91 @@
+#!/bin/bash
+
+RELAY=17
+BUTTON=27
+
+# ── Runtime paths ──────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Respect IMAGE_DIR from .env if already exported, otherwise default.
+IMAGE_DIR="${IMAGE_DIR:-$ROOT_DIR/data/images}"
+QUEUE_FILE="$ROOT_DIR/data/upload_queue.json"
+DEVICE_ID="${DEVICE_ID:-pi-001}"
+
+mkdir -p "$IMAGE_DIR" "$(dirname "$QUEUE_FILE")"
+
+# ── GPIO setup ─────────────────────────────────────────────────────────────────
+# op  = output push-pull (controls relay)
+# ip pu = input with pull-up resistor (button reads HIGH at rest, LOW when pressed)
+pinctrl set $RELAY op
+pinctrl set $BUTTON ip pu
+
+echo "System Ready. Waiting for button..."
+
+# ── Main polling loop ──────────────────────────────────────────────────────────
+while true
+do
+    state=$(pinctrl get $BUTTON | grep -o "hi\|lo")
+
+    # Button pressed — active LOW means "lo" = pressed
+    if [ "$state" = "lo" ]; then
+
+        echo "Button pressed - Starting capture sequence"
+
+        # Unique identifiers for this scan pair
+        TS=$(date +"%Y%m%d_%H%M%S")
+        SESSION_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
+        CAPTURED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+        IR_PATH="$IMAGE_DIR/IR_${TS}.jpg"
+        WHITE_PATH="$IMAGE_DIR/WHITE_${TS}.jpg"
+
+        # ── IR Capture ──────────────────────────────────────────────────────────
+        echo "Switching to IR"
+        pinctrl set $RELAY dl   # relay closes → IR illumination active
+        sleep 0.5               # relay settle
+        sleep 5                 # autofocus settle
+
+        rpicam-still -o "$IR_PATH" -t 5000 --ev -2 --gain 2
+
+        sleep 2
+
+        # ── White Capture ───────────────────────────────────────────────────────
+        echo "Switching to White"
+        pinctrl set $RELAY dh   # relay opens → White illumination active
+        sleep 0.5               # relay settle
+        sleep 5                 # autofocus settle
+
+        rpicam-still -o "$WHITE_PATH" -t 6000 --ev -1.3 --gain 2
+
+        echo "Capture complete."
+
+        # ── Enqueue for upload ──────────────────────────────────────────────────
+        # Both files must exist before we enqueue.
+        # The uploader worker reads this queue and routes to API or Roboflow
+        # depending on EDGE_MODE in .env (production | training).
+        if [ -f "$IR_PATH" ] && [ -f "$WHITE_PATH" ]; then
+            python3 "$ROOT_DIR/src/enqueue_capture.py" \
+                --raw    "$WHITE_PATH" \
+                --ir     "$IR_PATH" \
+                --session "$SESSION_ID" \
+                --device  "$DEVICE_ID" \
+                --captured-at "$CAPTURED_AT" \
+                --queue "$QUEUE_FILE" \
+            && echo "Queued session $SESSION_ID for upload." \
+            || echo "WARNING: enqueue failed — files saved locally at $IMAGE_DIR"
+        else
+            echo "ERROR: one or both capture files missing — skipping upload queue"
+        fi
+
+        # ── Wait for button release (prevents retrigger on hold) ───────────────
+        while [ "$(pinctrl get $BUTTON | grep -o "hi\|lo")" = "lo" ]; do
+            sleep 0.1
+        done
+
+        sleep 0.3   # extra debounce delay
+        echo "Ready again..."
+    fi
+
+    sleep 0.1
+done
