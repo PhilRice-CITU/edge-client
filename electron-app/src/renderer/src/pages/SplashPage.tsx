@@ -32,7 +32,7 @@ export function SplashPage() {
     <div className="flex h-full flex-col items-center justify-center gap-6 bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="h-16 w-16 animate-pulse rounded-2xl bg-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Rice Vision</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Hum.ai</h1>
         <p className="text-sm text-muted-foreground">PNS/BAFS 290:2025 Grading System</p>
       </div>
       {status && (
