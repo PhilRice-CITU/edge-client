@@ -1,42 +1,66 @@
-import { useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
-import { SPLASH_DURATION_MS } from '@renderer/lib/constants'
+import { AnimatedLogo } from '@renderer/components/atoms/AnimatedLogo'
 
 export function SplashPage() {
   const navigate = useNavigate()
   const { data: status, isError } = useDeviceStatus()
-  const minTimeElapsed = useRef(false)
+  const animationsDone = useRef(false)
   const statusReady = useRef(false)
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      minTimeElapsed.current = true
-      if (statusReady.current) {
-        navigate({ to: '/home' })
-      }
-    }, SPLASH_DURATION_MS)
-    return () => clearTimeout(timer)
+  const tryNavigate = useCallback(() => {
+    if (animationsDone.current && statusReady.current) {
+      navigate({ to: '/home' })
+    }
   }, [navigate])
 
   useEffect(() => {
     if ((status || isError) && !statusReady.current) {
       statusReady.current = true
-      if (minTimeElapsed.current) {
-        navigate({ to: '/home' })
-      }
+      tryNavigate()
     }
-  }, [status, isError, navigate])
+  }, [status, isError, tryNavigate])
+
+  const handleLastAnimationComplete = () => {
+    animationsDone.current = true
+    tryNavigate()
+  }
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 bg-background">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-16 w-16 animate-pulse rounded-2xl bg-primary" />
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Hum.ai</h1>
-        <p className="text-sm text-muted-foreground">PNS/BAFS 290:2025 Grading System</p>
+      <div className="flex flex-col items-center gap-4">
+        <AnimatedLogo size={72} animate={true} />
+        <div className="flex flex-col items-center gap-1">
+          <motion.h1
+            className="text-3xl font-bold tracking-tight text-foreground"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.4 }}
+          >
+            Hum.ai
+          </motion.h1>
+          <motion.p
+            className="text-sm text-muted-foreground"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.15, duration: 0.4 }}
+            onAnimationComplete={handleLastAnimationComplete}
+          >
+            PNS/BAFS 290:2025 Grading System
+          </motion.p>
+        </div>
       </div>
       {status && (
-        <p className="text-xs text-muted-foreground">{status.device_id}</p>
+        <motion.p
+          className="text-xs text-muted-foreground"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.35 }}
+        >
+          {status.device_id}
+        </motion.p>
       )}
     </div>
   )

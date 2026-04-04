@@ -5,6 +5,7 @@ import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
 import { useCreateSession } from '@renderer/hooks/useSession'
 import { StatusBadge } from '@renderer/components/molecules/StatusBadge'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
+import { AnimatedLogo } from '@renderer/components/atoms/AnimatedLogo'
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -38,7 +39,10 @@ export function HomePage() {
   return (
     <div className="flex h-full flex-col items-center justify-between p-8">
       <div className="flex w-full items-center justify-between">
-        <h1 className="text-xl font-semibold text-foreground">Hum.ai</h1>
+        <div className="flex items-center gap-2">
+          <AnimatedLogo size={28} animate={false} />
+          <h1 className="text-xl font-semibold text-foreground">Hum.ai</h1>
+        </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} />
           <button
