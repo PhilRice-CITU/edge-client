@@ -25,7 +25,7 @@ ensure_display() {
 }
 
 launch_kiosk() {
-    local electron_dir="$SCRIPT_DIR/electron"
+    local electron_dir="$SCRIPT_DIR/electron-app"
 
     if [ ! -d "$electron_dir" ]; then
         log_warn "Electron folder not found at $electron_dir; skipping kiosk launch"
@@ -40,6 +40,6 @@ launch_kiosk() {
     log_info "Launching Electron kiosk"
     (
         cd "$electron_dir" || exit 1
-        npx electron . --no-sandbox >> "${LOG_DIR:-/tmp}/electron.log" 2>&1 &
+        npm run start -- --no-sandbox >> "${LOG_DIR:-/tmp}/electron.log" 2>&1 &
     )
 }

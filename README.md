@@ -1,315 +1,248 @@
-# Edge Client
+# Rice Vision — Edge Client
 
-Local runtime for the rice evaluation device.
+The complete runtime for the Rice Vision grading device. Ships on a Raspberry Pi with a touchscreen, camera module, relay-controlled IR/white LEDs, and a physical capture button.
 
-This repository is the software that lives on the edge device and is responsible for:
-- watching the physical capture button,
-- switching relay-based lighting modes,
-- capturing IR and White images,
-- queueing captures locally,
-- uploading to the correct destination based on mode,
-- reporting device health,
-- exposing local status endpoints for the kiosk and debugging.
+---
 
-## Architecture At A Glance
+## Quick Start (Developer Laptop)
 
-```text
-Button press
-	-> scripts/capture.sh
-	-> src/enqueue_capture.py
-	-> data/upload_queue.json
-	-> src/uploader.py
-	-> src/upload_router.py
-			-> Production: API backend
-			-> Training: Roboflow
-
-Meanwhile:
-	startup.sh boots services
-	src/heartbeat.py reports liveness
-	src/app.py exposes local status endpoints
-```
-
-## Repository Status
-
-Implemented now:
-
-| Area | Status | Notes |
-|---|---|---|
-| Environment config | Ready | `.env.example` exists |
-| Logging and shell helpers | Ready | `lib/` foundation is implemented |
-| Capture pipeline | Ready on Pi | `scripts/capture.sh` uses `pinctrl` + `rpicam-still` |
-| Queueing | Ready | JSON queue writer and worker are implemented |
-| Upload routing | Ready | Supports `production` and `training` modes |
-| Heartbeat | Ready | Sends online status to backend |
-| Local API | Ready | `src/app.py` exposes status endpoints |
-| Startup orchestration | Ready | `startup.sh` wires services together |
-| Electron kiosk | Not implemented here yet | Intentionally skipped for manual learning |
-| Provisioning / Ansible | Not implemented yet | Planned later |
-
-## If You Fork This Repository
-
-After forking, do these first:
-
-1. Clone your fork.
-2. Create your local environment file from `.env.example`.
-3. Install Python dependencies.
-4. Validate the local API and queue flow on your laptop.
-5. Move to Raspberry Pi only when laptop-side flow is understood.
-
-Recommended mindset:
-- Use macOS or another laptop first to validate Python logic.
-- Use Raspberry Pi only for hardware-specific testing.
-- Do not start with full boot orchestration before you can explain each worker.
-
-## 1. What You Can Check Right Now
-
-This section is for the current project progress.
-
-Even if you have not installed anything yet, this is what the code is already designed to do and what parts can be tested on a normal laptop.
-
-### What works on macOS right now
-
-- `src/app.py` local API endpoints
-- `src/enqueue_capture.py` queue writing
-- `src/uploader.py` queue polling and retry behavior
-- `src/upload_router.py` mode-based routing logic
-- `src/heartbeat.py` request flow
-- `startup.sh` orchestration logic, except hardware capture
-
-### What does not fully work on macOS
-
-- `pinctrl`
-- `rpicam-still`
-- relay switching
-- physical GPIO button polling
-
-Those parts require Raspberry Pi OS and the actual device wiring.
-
-### Install only what you need to start learning
-
-From the repository root:
+You do **not** need a Raspberry Pi to work on most of this code. The Flask API, session manager, upload queue, and the entire Electron UI all run on macOS/Linux.
 
 ```bash
+# 1. Clone and enter
 cd edge-client
+
+# 2. Python backend
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install flask requests
+pip install flask requests
+
+# 3. Create your env file
 cp .env.example .env
-```
+# Edit .env — at minimum set DEVICE_ID and API_BASE_URL
 
-### Minimal `.env` values for laptop testing
-
-At minimum, review these values in `.env`:
-
-```env
-DEVICE_ID=pi-001
-API_BASE_URL=https://your-api-server.com
-EDGE_MODE=production
-PRODUCTION_UPLOAD_TARGET=api
-TRAINING_UPLOAD_TARGET=roboflow
-```
-
-If you do not yet have a real API or Roboflow setup, that is fine. You can still test the queue and routing flow. Uploads will simply fail and retry, which is expected behavior.
-
-### Current test flow
-
-Start the local API:
-
-```bash
-source .venv/bin/activate
+# 4. Start the local Flask API
 python3 src/app.py
+# → runs on http://127.0.0.1:5055
+
+# 5. Electron UI (separate terminal)
+cd electron-app
+npm install
+npm run dev
+# → opens the kiosk UI connecting to Flask on port 5055
 ```
 
-Check the endpoints:
+### Verify it works
 
 ```bash
-curl http://localhost:5000/health
-curl http://localhost:5000/mode
-curl http://localhost:5000/queue-size
-curl http://localhost:5000/status
+# Flask health
+curl http://localhost:5055/health
+# → {"status":"ok"}
+
+# Device status (what the Electron UI polls)
+curl http://localhost:5055/status
+# → {"device_id":"pi-001","edge_mode":"production","images_on_disk":0,"queued_uploads":0}
+
+# Create a session (what "Grade Rice" does)
+curl -X POST http://localhost:5055/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"grade","operator_name":"","rice_variety":null}'
+# → {"id":"<uuid>","mode":"grade","status":"capturing","batches":[],...}
 ```
 
-Write a test queue item manually:
+> **Note:** The Capture button will fail on a laptop because `rpicam-still` and `pinctrl` are Pi-only. That is expected. Everything else (session flow, status polling, grade results) works fine.
+
+---
+
+## Quick Start (Raspberry Pi)
 
 ```bash
-mkdir -p data/images
-touch data/images/WHITE_test.jpg data/images/IR_test.jpg
+# 1. Clone the repo
+git clone <your-repo-url> ~/rice-vision
+cd ~/rice-vision/edge-client
 
-python3 src/enqueue_capture.py \
-	--raw data/images/WHITE_test.jpg \
-	--ir data/images/IR_test.jpg \
-	--session test-session-1 \
-	--device pi-001 \
-	--captured-at 2026-03-16T12:00:00Z \
-	--queue data/upload_queue.json
+# 2. Run the one-time setup script
+chmod +x setup.sh
+./setup.sh
+
+# 3. Edit your .env
+nano .env
+# → Set DEVICE_ID, API_BASE_URL, DEVICE_HOST (your Pi's LAN IP)
+
+# 4. Edit rice-vision.service if your username or path differs from pi / /home/pi/rice-vision
+nano rice-vision.service
+
+# 5. Start the service
+sudo systemctl start rice-vision
+
+# 6. Watch logs
+journalctl -u rice-vision -f
 ```
 
-Inspect the queue:
+The `setup.sh` script installs system packages, creates the Python venv, builds the Electron app, copies `.env.example` → `.env`, and registers the systemd unit.
+
+---
+
+## Running Tests
+
+### Electron / React (Vitest)
 
 ```bash
-cat data/upload_queue.json
-curl http://localhost:5000/queue-size
+cd electron-app
+npm test              # single run — 10 files, 39 tests
+npm run test:watch    # watch mode
+npm run test:coverage # with coverage report
 ```
 
-Run the uploader worker:
+### Python (pytest)
 
 ```bash
 source .venv/bin/activate
-python3 src/uploader.py
+pytest tests/ -v      # 2 files, 19 tests
 ```
 
-What you are proving with this test:
-- the queue file is written correctly,
-- the uploader polls and reads jobs,
-- retry behavior works,
-- routing mode resolution works.
+### What the tests cover
 
-### Why this stage matters
+| Layer | File | Tests |
+|-------|------|-------|
+| Hook | `useDeviceStatus.test.tsx` | Fetch success, connection error, non-200 |
+| Hook | `useSession.test.tsx` | Create, update, submit, disabled-when-null |
+| Hook | `useCapture.test.tsx` | POST + cache update, error state |
+| Molecule | `CaptureButton.test.tsx` | Label states, disabled, onClick |
+| Molecule | `StatusBadge.test.tsx` | Offline, online with device_id |
+| Organism | `BatchGallery.test.tsx` | Empty state, card rendering |
+| Organism | `CameraPreview.test.tsx` | Image renders, 503 fallback, capture overlay |
+| Organism | `ResultCard.test.tsx` | Grade display, batch count, dashboard link |
+| Page | `SplashPage.test.tsx` | Branding, device_id, timer navigation |
+| Page | `HomePage.test.tsx` | Mode buttons, session creation, Flask error |
+| Python | `test_session_manager.py` | CRUD, batch append, unknown-id handling |
+| Python | `test_app.py` | All Flask endpoints, error codes, mock capture |
 
-This stage gives the team a safe way to validate the architecture before mixing in Raspberry Pi hardware concerns.
+---
 
-That is good engineering practice because it isolates failure domains:
-- Python logic problems are found on laptop.
-- GPIO/camera problems are found on Pi.
-- Cloud integration problems are found through uploader logs and API responses.
+## Environment Variables
 
-## 2. Final Run Flow
+All variables live in `.env` (copied from `.env.example`). The critical ones:
 
-This section is the target operating flow once dependencies are installed and the code is deployed to the Raspberry Pi.
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DEVICE_ID` | `pi-001` | Identifies this Pi to the API server |
+| `API_BASE_URL` | *(required)* | Cloud API server URL |
+| `FLASK_PORT` | `5055` | Port for the local Flask API |
+| `DEVICE_HOST` | `192.168.1.100` | This Pi's LAN IP — used for grade callbacks |
+| `EDGE_MODE` | `production` or `training` | Controls upload destination |
+| `DEVICE_SECRET` | *(empty)* | Auth token for API server |
 
-### Final prerequisites on Raspberry Pi
+See [`.env.example`](.env.example) for the full list with comments.
 
-You will need:
+---
 
-- Raspberry Pi OS
-- Python 3
-- `flask`
-- `requests`
-- `pinctrl`
-- `rpicam-still`
-- camera module configured and working
-- relay wired correctly
-- button wired correctly
-- valid `.env`
+## Architecture Overview
 
-### Expected environment configuration
+```
+┌───────────────────────────────────────────────────────┐
+│  Touchscreen (Electron Kiosk)                         │
+│  React 19 + TanStack Router + TanStack Query          │
+│  Polls Flask API on localhost:5055                     │
+└─────────────────────┬─────────────────────────────────┘
+                      │ HTTP (fetch)
+┌─────────────────────▼─────────────────────────────────┐
+│  Flask API  (src/app.py)  — port 5055                 │
+│  Session CRUD, capture trigger, submit, webhooks      │
+│  │                                                    │
+│  ├── src/session_manager.py  (JSON file per session)  │
+│  └── scripts/capture.sh --once  (subprocess)          │
+└─────────────────────┬─────────────────────────────────┘
+                      │ HTTP POST
+┌─────────────────────▼─────────────────────────────────┐
+│  Cloud API Server  (api-server/)                      │
+│  Receives batch scans, runs AI grading, sends         │
+│  grade result back to Flask webhook                   │
+└───────────────────────────────────────────────────────┘
 
-Important variables from `.env.example`:
-
-```env
-DEVICE_ID=pi-001
-FLASK_PORT=5000
-IMAGE_DIR=./data/images
-LOG_DIR=/tmp/logs
-
-EDGE_MODE=production
-PRODUCTION_UPLOAD_TARGET=api
-TRAINING_UPLOAD_TARGET=roboflow
-
-API_BASE_URL=https://your-api-server.com
-API_UPLOAD_PATH=/scans
-API_HEARTBEAT_PATH=/devices/heartbeat
-
-ROBOFLOW_API_KEY=
-ROBOFLOW_WORKSPACE=
-ROBOFLOW_PROJECT=
-ROBOFLOW_DATASET_NAME=edge-captures
+Background workers (started by startup.sh):
+  ├── src/uploader.py      — polls upload_queue.json, routes to API or Roboflow
+  ├── src/heartbeat.py     — sends liveness POST every 60s
+  └── scripts/capture.sh   — GPIO button polling loop (Pi only)
 ```
 
-### Final boot command
+---
 
-```bash
-bash startup.sh
+## Folder Structure
+
+```
+edge-client/
+├── .env.example           # All environment variables with defaults
+├── startup.sh             # Main orchestration — starts all services
+├── setup.sh               # One-time Pi installer (apt, venv, npm, systemd)
+├── rice-vision.service    # systemd unit file for auto-start on boot
+│
+├── lib/                   # Bash helper modules (sourced by startup.sh)
+│   ├── log.sh             #   Coloured logging: log_info, log_warn, log_error
+│   ├── env.sh             #   .env loading + require_vars + apply_defaults
+│   ├── lock.sh            #   PID lock file — prevents double-start
+│   ├── services.sh        #   start/stop/track background service PIDs
+│   └── display.sh         #   X11/Wayland detection + Electron kiosk launch
+│
+├── scripts/
+│   └── capture.sh         # GPIO relay + camera capture (--once for Flask)
+│
+├── src/                   # Python services
+│   ├── app.py             #   Flask API (11 endpoints)
+│   ├── session_manager.py #   JSON-backed session CRUD
+│   ├── enqueue_capture.py #   CLI: append capture pair to upload queue
+│   ├── uploader.py        #   Worker: poll queue → upload_router
+│   ├── upload_router.py   #   Routes uploads to API backend or Roboflow
+│   └── heartbeat.py       #   Worker: POST device status every N seconds
+│
+├── electron-app/          # Touchscreen kiosk UI (see TECHNICAL.md)
+│   ├── src/main/          #   Electron main process
+│   ├── src/preload/       #   contextBridge (IPC security layer)
+│   └── src/renderer/src/  #   React app (Atomic Design)
+│
+├── tests/                 # Python tests (pytest)
+│   ├── test_session_manager.py
+│   └── test_app.py
+│
+└── data/                  # Runtime data (gitignored)
+    ├── images/            #   Captured IR + white JPEGs
+    ├── sessions/          #   JSON session files
+    ├── upload_queue.json  #   Pending uploads
+    └── logs/              #   Service log files
 ```
 
-### What `startup.sh` does
+---
 
-In order, it:
+## Common Issues
 
-1. Creates runtime directories.
-2. Loads helper libraries from `lib/`.
-3. Acquires a lock so only one instance runs.
-4. Loads `.env` and applies defaults.
-5. Starts Flask local API.
-6. Waits until `/health` responds.
-7. Starts uploader worker.
-8. Starts heartbeat worker.
-9. Starts the hardware capture loop.
-10. Tries to launch kiosk only if display tooling exists.
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| "Grade Rice" shows Flask error | Flask not running | `source .venv/bin/activate && python3 src/app.py` |
+| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop) | Expected on macOS; camera works on Pi only |
+| Electron shows blank white screen | `npm run dev` not started | Run `npm run dev` inside `electron-app/` |
+| `startup.sh` exits immediately | Missing `DEVICE_ID` or `API_BASE_URL` | Edit `.env` with real values |
+| Port 5055 already in use | Another Flask instance running | `lsof -i :5055` and kill it |
+| Tests fail with module not found | Missing dependencies | `pip install flask requests` / `npm install` |
 
-### Final runtime behavior
-
-When the button is pressed:
-
-1. `scripts/capture.sh` detects active-low button press.
-2. Relay switches to IR.
-3. `rpicam-still` captures IR image.
-4. Relay switches to White.
-5. `rpicam-still` captures White image.
-6. `src/enqueue_capture.py` appends the capture pair to `data/upload_queue.json`.
-7. `src/uploader.py` picks up that job.
-8. `src/upload_router.py` decides the upload destination.
-9. Upload goes either to API backend or Roboflow.
-
-At the same time:
-- `src/heartbeat.py` posts liveness on an interval.
-- `src/app.py` exposes status endpoints for inspection and kiosk use.
+---
 
 ## Useful Commands
 
-Activate environment:
-
 ```bash
-source .venv/bin/activate
-```
+# Flask API only
+source .venv/bin/activate && python3 src/app.py
 
-Run API only:
+# Electron dev mode (hot reload)
+cd electron-app && npm run dev
 
-```bash
-python3 src/app.py
-```
-
-Run uploader only:
-
-```bash
-python3 src/uploader.py
-```
-
-Run heartbeat only:
-
-```bash
-python3 src/heartbeat.py
-```
-
-Run full stack:
-
-```bash
+# Full stack on Pi
 bash startup.sh
+
+# Full stack via systemd
+sudo systemctl start rice-vision
+journalctl -u rice-vision -f
+
+# Run all tests
+cd electron-app && npm test
+cd .. && .venv/bin/pytest tests/ -v
 ```
-
-Check API status:
-
-```bash
-curl http://localhost:5000/health
-curl http://localhost:5000/status
-curl http://localhost:5000/mode
-curl http://localhost:5000/queue-size
-```
-
-## Common First Problems
-
-| Problem | Likely cause | Fix |
-|---|---|---|
-| `flask` import error | dependency not installed | install `flask` in your venv |
-| `requests` import error | dependency not installed | install `requests` in your venv |
-| upload keeps retrying | placeholder API/Roboflow config | expected until real credentials exist |
-| `pinctrl: command not found` | running on macOS | expected, test this on Pi |
-| `rpicam-still: command not found` | not on Raspberry Pi camera stack | expected, test this on Pi |
-| startup exits early | `.env` missing required values | create `.env` from `.env.example` |
-
-## Team Notes
-
-- This repository is already at the stage where backend workers and orchestration can be reviewed as a team.
-- UI work can proceed separately later without blocking capture, upload, and health reporting.
-- The best next step for the team is to validate the laptop-safe flow first, then move to device testing.
