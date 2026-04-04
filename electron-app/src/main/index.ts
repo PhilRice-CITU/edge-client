@@ -1,20 +1,24 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): void {
-  // Create the browser window.
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const isKiosk = width <= 640
+
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: isKiosk ? width : 1024,
+    height: isKiosk ? height : 768,
+    kiosk: isKiosk,
+    frame: !isKiosk,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+      sandbox: false,
+    },
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -51,6 +55,15 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Open URLs in the system browser (used by ResultCard dashboard link)
+  ipcMain.handle('open-external', (_, url: string) => shell.openExternal(url))
+
+  // Renderer queries the Flask base URL so it works with non-default FLASK_PORT
+  ipcMain.handle('get-flask-url', () => {
+    const port = process.env['FLASK_PORT'] ?? '5055'
+    return `http://127.0.0.1:${port}`
+  })
 
   createWindow()
 

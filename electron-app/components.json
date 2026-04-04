@@ -12,12 +12,13 @@
   },
   "iconLibrary": "lucide",
   "rtl": false,
+  "resolveFrom": "src/renderer/src",
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "components": "@renderer/components",
+    "utils": "@renderer/lib/utils",
+    "ui": "@renderer/components/atoms",
+    "lib": "@renderer/lib",
+    "hooks": "@renderer/hooks"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

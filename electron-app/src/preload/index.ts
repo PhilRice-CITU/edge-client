@@ -1,8 +1,11 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
+  getFlaskUrl: (): Promise<string> => ipcRenderer.invoke('get-flask-url'),
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
