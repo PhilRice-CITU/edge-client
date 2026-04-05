@@ -1,7 +1,7 @@
 [Unit]
 Description=Rice Vision Edge Client
-After=network-online.target
-Wants=network-online.target
+After=network-online.target graphical-session.target
+Wants=network-online.target graphical-session.target
 
 [Service]
 Type=simple
@@ -23,8 +23,10 @@ RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
-# Environment needed by Python venv
+# Environment needed by Python venv and display
 Environment="PATH=/home/humai/edge-client/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/humai/.Xauthority"
 
 [Install]
 WantedBy=multi-user.target
