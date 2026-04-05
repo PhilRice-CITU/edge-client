@@ -6,11 +6,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 # Change User to the user you SSH / log in as on the Pi
-User=pi
-WorkingDirectory=/home/pi/rice-vision/edge-client
+User=humai
+WorkingDirectory=/home/humai/edge-client
 
 # Runs the main orchestration script
-ExecStart=/home/pi/rice-vision/edge-client/startup.sh
+ExecStart=/home/humai/edge-client/startup.sh
 
 # Give Flask 60 s to come up before systemd marks the service failed
 TimeoutStartSec=60
@@ -24,7 +24,7 @@ StandardOutput=journal
 StandardError=journal
 
 # Environment needed by Python venv
-Environment="PATH=/home/pi/rice-vision/edge-client/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PATH=/home/humai/edge-client/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 [Install]
 WantedBy=multi-user.target
