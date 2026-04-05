@@ -42,6 +42,6 @@ launch_kiosk() {
     mkdir -p "$(dirname "$electron_log")"
     (
         cd "$electron_dir" || exit 1
-        npm run start >> "$electron_log" 2>&1 &
+        ./node_modules/.bin/electron . --no-sandbox >> "$electron_log" 2>&1 &
     )
 }
