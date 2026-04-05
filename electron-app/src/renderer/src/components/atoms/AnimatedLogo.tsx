@@ -31,35 +31,34 @@ export function AnimatedLogo({ size = 64, animate = true }: AnimatedLogoProps) {
     <motion.svg
       width={size}
       height={size}
-      viewBox="0 0 100 100"
+      viewBox="0 0 84 84"
       variants={containerVariants}
       initial={animate ? 'hidden' : 'show'}
       animate="show"
-      className="text-primary"
     >
       {/* Top Left Petal */}
       <motion.path
         variants={petalVariants}
-        fill="currentColor"
-        d="M 46 46 L 26 46 A 16 16 0 0 1 10 30 L 10 26 A 16 16 0 0 1 26 10 L 30 10 A 16 16 0 0 1 46 26 Z"
+        fill="#EB6925"
+        d="M18.7564 0.259533L39 0V20C39 30.4934 30.4934 39 20 39H0V19.258C0 8.85956 8.35887 0.392835 18.7564 0.259533Z"
       />
       {/* Top Right Petal */}
       <motion.path
         variants={petalVariants}
-        fill="currentColor"
-        d="M 54 46 L 54 26 A 16 16 0 0 1 70 10 L 74 10 A 16 16 0 0 1 90 26 L 90 30 A 16 16 0 0 1 74 46 Z"
+        fill="#EB6925"
+        d="M65.2436 0.259533L45 0V20C45 30.4934 53.5066 39 64 39H84V19.258C84 8.85956 75.6411 0.392835 65.2436 0.259533Z"
       />
       {/* Bottom Right Petal */}
       <motion.path
         variants={petalVariants}
-        fill="currentColor"
-        d="M 54 54 L 74 54 A 16 16 0 0 1 90 70 L 90 74 A 16 16 0 0 1 74 90 L 70 90 A 16 16 0 0 1 54 74 Z"
+        fill="#EB6925"
+        d="M65.2436 45.2595L45 45V65C45 75.4934 53.5066 84 64 84H84V64.258C84 53.8596 75.6411 45.3928 65.2436 45.2595Z"
       />
       {/* Bottom Left Petal */}
       <motion.path
         variants={petalVariants}
-        fill="currentColor"
-        d="M 46 54 L 46 74 A 16 16 0 0 1 30 90 L 26 90 A 16 16 0 0 1 10 74 L 10 70 A 16 16 0 0 1 26 54 Z"
+        fill="#EB6925"
+        d="M18.7564 83.7405L39 84V64C39 53.5066 30.4934 45 20 45H0V64.742C0 75.1404 8.35887 83.6072 18.7564 83.7405Z"
       />
     </motion.svg>
   )

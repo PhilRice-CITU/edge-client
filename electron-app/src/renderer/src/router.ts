@@ -10,6 +10,7 @@ import { HomePage } from '@renderer/pages/HomePage'
 import { SessionPage } from '@renderer/pages/SessionPage'
 import { ResultPage } from '@renderer/pages/ResultPage'
 import { TrainingPage } from '@renderer/pages/TrainingPage'
+import { SetupPage } from '@renderer/pages/SetupPage'
 import { SettingsPage } from '@renderer/pages/SettingsPage'
 
 export const rootRoute = createRootRoute({ component: App })
@@ -52,6 +53,12 @@ export const trainingRoute = createRoute({
   component: TrainingPage,
 })
 
+export const setupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/setup',
+  component: SetupPage,
+})
+
 export const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
@@ -65,6 +72,7 @@ const routeTree = rootRoute.addChildren([
   sessionRoute,
   resultRoute,
   trainingRoute,
+  setupRoute,
   settingsRoute,
 ])
 

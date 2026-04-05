@@ -22,9 +22,17 @@ export interface Session {
   created_at: string
 }
 
+export interface Region {
+  id: string
+  name: string
+  code: string
+}
+
 export interface DeviceStatus {
   device_id: string
+  display_name: string
   edge_mode: string
   images_on_disk: number
   queued_uploads: number
+  qr_url: string
 }

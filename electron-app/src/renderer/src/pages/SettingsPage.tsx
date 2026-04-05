@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
+import { QRCodeSVG } from 'qrcode.react'
 import { Moon, Sun, Cpu, Wifi, ArrowLeft } from 'lucide-react'
 import { useTheme } from '@renderer/hooks/useTheme'
 import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
@@ -67,6 +68,10 @@ export function SettingsPage() {
           <div className="flex flex-col gap-px overflow-hidden rounded-xl border border-border bg-card">
             <InfoRow
               icon={<Cpu size={16} />}
+              label="Name"
+              value={status?.display_name || status?.device_id || '—'}
+            />
+            <InfoRow
               label="Device ID"
               value={status?.device_id ?? '—'}
             />
@@ -89,6 +94,24 @@ export function SettingsPage() {
             />
           </div>
         </section>
+
+        {/* Device Identity / QR Code */}
+        {status?.qr_url && (
+          <section className="flex flex-col gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Device Identity
+            </h2>
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-4">
+              {status.display_name && (
+                <p className="text-sm font-semibold text-foreground">{status.display_name}</p>
+              )}
+              <div className="rounded-xl bg-white p-3 shadow-sm">
+                <QRCodeSVG value={status.qr_url} size={140} />
+              </div>
+              <p className="text-xs text-muted-foreground">Scan to view in web dashboard</p>
+            </div>
+          </section>
+        )}
 
         {/* App info */}
         <section className="flex flex-col gap-2">

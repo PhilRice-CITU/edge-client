@@ -9,15 +9,17 @@ export function SplashPage() {
   const { data: status, isError } = useDeviceStatus()
   const animationsDone = useRef(false)
   const statusReady = useRef(false)
+  const deviceIdRef = useRef<string>('')
 
   const tryNavigate = useCallback(() => {
     if (animationsDone.current && statusReady.current) {
-      navigate({ to: '/home' })
+      navigate({ to: deviceIdRef.current ? '/home' : '/setup' })
     }
   }, [navigate])
 
   useEffect(() => {
     if ((status || isError) && !statusReady.current) {
+      deviceIdRef.current = status?.device_id ?? ''
       statusReady.current = true
       tryNavigate()
     }

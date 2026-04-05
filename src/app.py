@@ -9,6 +9,7 @@ from typing import Any
 import requests as http
 from flask import Flask, Response, jsonify, request
 
+import provision as _provision
 import session_manager
 
 app = Flask(__name__)
@@ -61,10 +62,12 @@ def status() -> Any:
 
     return jsonify(
         {
-            "device_id": os.getenv("DEVICE_ID", "pi-001"),
+            "device_id": os.getenv("DEVICE_ID", ""),
+            "display_name": os.getenv("DEVICE_DISPLAY_NAME", ""),
             "edge_mode": os.getenv("EDGE_MODE", "production"),
             "images_on_disk": images_count,
             "queued_uploads": queue_count,
+            "qr_url": os.getenv("DEVICE_QR_URL", ""),
         }
     )
 
@@ -237,6 +240,71 @@ def webhook_result(session_id: str) -> Any:
         dashboard_url=body.get("dashboard_url"),
     )
     return jsonify({"ok": True})
+
+
+# ── Setup / Provisioning ───────────────────────────────────────────────
+
+
+@app.get("/setup/regions")
+def setup_regions() -> Any:
+    """Proxy the public region list from the API server — no auth required."""
+    try:
+        resp = http.get(f"{API_BASE_URL}/regions/public", timeout=API_TIMEOUT)
+        resp.raise_for_status()
+        return jsonify(resp.json())
+    except http.exceptions.RequestException as exc:
+        return jsonify({"error": "Could not reach API server", "detail": str(exc)}), 502
+
+
+@app.post("/setup/register")
+def setup_register() -> Any:
+    """Register this device with the API server. Writes DEVICE_ID to .env."""
+    body = request.get_json() or {}
+    region_code = body.get("region_code", "").strip()
+    if not region_code:
+        return jsonify({"error": "region_code is required"}), 400
+
+    provision_token = os.getenv("PROVISION_TOKEN", "").strip()
+    if not provision_token:
+        return jsonify({"error": "PROVISION_TOKEN not set in .env"}), 500
+
+    try:
+        resp = http.post(
+            f"{API_BASE_URL}/devices/provision",
+            json={
+                "provision_token": provision_token,
+                "region_code": region_code,
+                "mac_address": _provision._mac_address(),
+                "hostname": _provision._hostname_hint(),
+            },
+            timeout=API_TIMEOUT,
+        )
+        resp.raise_for_status()
+    except http.exceptions.RequestException as exc:
+        return jsonify({"error": "Registration failed", "detail": str(exc)}), 502
+
+    data = resp.json()
+    device_id: str = data["device_id"]
+    display_name: str = data["display_name"]
+    qr_url: str = data.get("qr_url", "")
+
+    _provision.write_device_identity(device_id, display_name, qr_url)
+
+    return jsonify({"device_id": device_id, "display_name": display_name, "qr_url": qr_url})
+
+
+@app.post("/setup/claim")
+def setup_claim() -> Any:
+    """Write a known device_id to .env (re-imaged Pi claiming its prior identity)."""
+    body = request.get_json() or {}
+    device_id = body.get("device_id", "").strip()
+    if not device_id:
+        return jsonify({"error": "device_id is required"}), 400
+
+    existing_display_name = os.getenv("DEVICE_DISPLAY_NAME", "")
+    _provision.write_device_identity(device_id, existing_display_name, "")
+
+    return jsonify({"device_id": device_id, "display_name": existing_display_name or "claimed"})
 
 
 if __name__ == "__main__":

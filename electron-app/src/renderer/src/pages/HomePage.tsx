@@ -13,6 +13,7 @@ export function HomePage() {
   const createSession = useCreateSession()
   const [creating, setCreating] = useState(false)
   const [flaskError, setFlaskError] = useState(false)
+  const isProduction = import.meta.env.VITE_EDGE_MODE === 'production'
 
   const handleGradeMode = async () => {
     if (creating) return
@@ -69,9 +70,11 @@ export function HomePage() {
         <KioskButton onClick={handleGradeMode} disabled={creating} variant="primary">
           {creating ? 'Starting…' : 'Grade Rice'}
         </KioskButton>
-        <KioskButton onClick={handleTrainMode} variant="secondary">
-          Training Mode
-        </KioskButton>
+        {!isProduction && (
+          <KioskButton onClick={handleTrainMode} variant="secondary">
+            Training Mode
+          </KioskButton>
+        )}
       </div>
     </div>
   )

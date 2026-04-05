@@ -26,7 +26,13 @@ trap 'release_lock; shutdown_all' EXIT INT TERM
 log_section "Environment"
 load_env "$SCRIPT_DIR/.env"
 apply_defaults
-require_vars DEVICE_ID API_BASE_URL
+require_vars API_BASE_URL
+
+log_section "Provisioning"
+python3 "$APP_DIR/provision.py" || log_fatal "Device provisioning failed — check .env and API server"
+# Re-source .env so DEVICE_ID written by provision.py is visible to child processes
+load_env "$SCRIPT_DIR/.env"
+require_vars DEVICE_ID
 
 log_section "Flask"
 start_python_service "flask" "$APP_DIR/app.py"
