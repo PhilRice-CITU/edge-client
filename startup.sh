@@ -47,6 +47,17 @@ start_python_service "heartbeat" "$APP_DIR/heartbeat.py"
 log_section "Capture Button Loop"
 start_shell_service "capture" "$SCRIPTS_DIR/capture.sh"
 
+log_section "Electron build"
+ELECTRON_OUT="$SCRIPT_DIR/electron-app/out"
+if [[ ! -d "$ELECTRON_OUT" ]]; then
+    log_info "No built Electron app found — building now (this may take a few minutes)…"
+    npm --prefix "$SCRIPT_DIR/electron-app" run build:linux \
+        || log_fatal "Electron build failed — check npm output above"
+    log_ok "Electron app built"
+else
+    log_ok "Electron app already built"
+fi
+
 log_section "Kiosk"
 if ensure_display; then
     launch_kiosk
