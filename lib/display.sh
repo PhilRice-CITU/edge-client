@@ -38,8 +38,10 @@ launch_kiosk() {
     fi
 
     log_info "Launching Electron kiosk"
+    local electron_log="$SCRIPT_DIR/data/logs/electron.log"
+    mkdir -p "$(dirname "$electron_log")"
     (
         cd "$electron_dir" || exit 1
-        npm run start -- --no-sandbox >> "${LOG_DIR:-/tmp}/electron.log" 2>&1 &
+        npm run start -- --no-sandbox >> "$electron_log" 2>&1 &
     )
 }
