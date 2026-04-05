@@ -30,7 +30,7 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
-    - deb
+    - dir
   maintainer: electronjs.org
   category: Utility
 appImage:
