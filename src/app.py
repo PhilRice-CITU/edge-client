@@ -8,11 +8,13 @@ from typing import Any
 
 import requests as http
 from flask import Flask, Response, jsonify, request
+from flask_cors import CORS
 
 import provision as _provision
 import session_manager
 
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
 _ROOT = Path(__file__).resolve().parent.parent
 QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_ROOT / "data" / "upload_queue.json")))
