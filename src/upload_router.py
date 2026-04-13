@@ -63,17 +63,18 @@ def upload_to_api(item: Dict) -> bool:
 def upload_to_roboflow(item: Dict) -> bool:
     api_key = os.getenv("ROBOFLOW_API_KEY", "").strip()
     workspace = os.getenv("ROBOFLOW_WORKSPACE", "").strip()
-    project = os.getenv("ROBOFLOW_PROJECT", "").strip()
+    legacy_project = os.getenv("ROBOFLOW_PROJECT", "").strip()
+    project_normal = os.getenv("ROBOFLOW_PROJECT_NORMAL", "").strip() or legacy_project
+    project_ir = os.getenv("ROBOFLOW_PROJECT_IR", "").strip() or legacy_project
     dataset_name = os.getenv("ROBOFLOW_DATASET_NAME", "edge-captures").strip()
 
-    if not api_key or not workspace or not project:
-        raise ValueError("ROBOFLOW_API_KEY, ROBOFLOW_WORKSPACE, and ROBOFLOW_PROJECT are required")
-
-    # Simple upload endpoint pattern for dataset ingestion. Adjust to your exact Roboflow API version.
-    endpoint = (
-        f"https://api.roboflow.com/dataset/{workspace}/{project}/upload"
-        f"?api_key={api_key}&name={dataset_name}"
-    )
+    if not api_key or not workspace:
+        raise ValueError("ROBOFLOW_API_KEY and ROBOFLOW_WORKSPACE are required")
+    if not project_normal or not project_ir:
+        raise ValueError(
+            "ROBOFLOW_PROJECT_NORMAL and ROBOFLOW_PROJECT_IR are required "
+            "(or set legacy ROBOFLOW_PROJECT for both)"
+        )
 
     raw_path = Path(item["raw"])
     ir_path = Path(item["ir"])
@@ -81,14 +82,60 @@ def upload_to_roboflow(item: Dict) -> bool:
     if not raw_path.exists() or not ir_path.exists():
         raise FileNotFoundError("Capture files not found for Roboflow upload")
 
-    # Upload both images as separate entries with stable names.
-    ok_raw = _upload_file_to_roboflow(endpoint, raw_path, item, suffix="raw")
-    ok_ir = _upload_file_to_roboflow(endpoint, ir_path, item, suffix="ir")
+    # Upload both images as separate entries, routing WHITE/raw and IR to different projects.
+    ok_raw = _upload_file_to_roboflow(
+        workspace,
+        api_key,
+        dataset_name,
+        raw_path,
+        item,
+        suffix="raw",
+        project_normal=project_normal,
+        project_ir=project_ir,
+    )
+    ok_ir = _upload_file_to_roboflow(
+        workspace,
+        api_key,
+        dataset_name,
+        ir_path,
+        item,
+        suffix="ir",
+        project_normal=project_normal,
+        project_ir=project_ir,
+    )
     return ok_raw and ok_ir
 
 
-def _upload_file_to_roboflow(endpoint: str, file_path: Path, item: Dict, suffix: str) -> bool:
+def _select_roboflow_project(file_path: Path, suffix: str, project_normal: str, project_ir: str) -> str:
+    filename = file_path.name.upper()
+
+    if filename.startswith("IR_"):
+        return project_ir
+    if filename.startswith("WHITE_"):
+        return project_normal
+
+    # Fallback to queue field semantics when prefixes are unavailable.
+    if suffix == "ir":
+        return project_ir
+    return project_normal
+
+
+def _upload_file_to_roboflow(
+    workspace: str,
+    api_key: str,
+    dataset_name: str,
+    file_path: Path,
+    item: Dict,
+    suffix: str,
+    project_normal: str,
+    project_ir: str,
+) -> bool:
     image_name = f"{item.get('device_id', 'device')}_{item.get('session_id', 'session')}_{suffix}.jpg"
+    target_project = _select_roboflow_project(file_path, suffix, project_normal, project_ir)
+    endpoint = (
+        f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload"
+        f"?api_key={api_key}&name={dataset_name}"
+    )
 
     with open(file_path, "rb") as file_obj:
         response = requests.post(
