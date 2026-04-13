@@ -26,7 +26,7 @@ trap 'release_lock; shutdown_all' EXIT INT TERM
 log_section "Environment"
 load_env "$SCRIPT_DIR/.env"
 apply_defaults
-require_vars API_BASE_URL
+require_vars API_BASE_URL DEVICE_SECRET
 
 log_section "Provisioning"
 python3 "$APP_DIR/provision.py" || log_fatal "Device provisioning failed — check .env and API server"
@@ -43,6 +43,9 @@ start_python_service "uploader" "$APP_DIR/uploader.py"
 
 log_section "Heartbeat"
 start_python_service "heartbeat" "$APP_DIR/heartbeat.py"
+
+log_section "Command Consumer"
+start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
 
 log_section "Capture Button Loop"
 start_shell_service "capture" "$SCRIPTS_DIR/capture.sh"
