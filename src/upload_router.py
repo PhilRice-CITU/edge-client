@@ -150,19 +150,36 @@ def _upload_file_to_roboflow(
         f"{item.get('session_id', 'session')}_{suffix}.jpg"
     )
     target_project = _select_roboflow_project(file_path, suffix, project_normal, project_ir)
-    endpoint = f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload"
+    endpoint_candidates = [
+        f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload",
+        f"https://api.roboflow.com/dataset/{target_project}/upload",
+        f"https://api.roboflow.com/{workspace}/{target_project}/upload",
+    ]
     query_params = {
         "api_key": api_key,
         "name": image_name,
     }
 
-    with open(file_path, "rb") as file_obj:
-        response = requests.post(
-            endpoint,
-            params=query_params,
-            files={"file": (image_name, file_obj, "image/jpeg")},
-            timeout=int(os.getenv("API_TIMEOUT_SECONDS", "30")),
-        )
+    response = None
+    used_endpoint = ""
+    for endpoint in endpoint_candidates:
+        with open(file_path, "rb") as file_obj:
+            candidate_response = requests.post(
+                endpoint,
+                params=query_params,
+                files={"file": (image_name, file_obj, "image/jpeg")},
+                timeout=int(os.getenv("API_TIMEOUT_SECONDS", "30")),
+            )
+        if candidate_response.status_code != 404:
+            response = candidate_response
+            used_endpoint = endpoint
+            break
+
+    if response is None:
+        # Keep the last response for downstream logging/details.
+        response = candidate_response
+        used_endpoint = endpoint_candidates[-1]
+
     accepted = response.ok
     details = ""
     try:
@@ -178,12 +195,14 @@ def _upload_file_to_roboflow(
     if not accepted:
         _log(
             f"roboflow file upload failed status={response.status_code} "
-            f"project={target_project} file={file_path.name} image_name={image_name} response={details}"
+            f"project={target_project} file={file_path.name} image_name={image_name} "
+            f"endpoint={used_endpoint} response={details}"
         )
     else:
         _log(
             f"roboflow file upload accepted status={response.status_code} "
-            f"project={target_project} file={file_path.name} image_name={image_name} response={details}"
+            f"project={target_project} file={file_path.name} image_name={image_name} "
+            f"endpoint={used_endpoint} response={details}"
         )
     return accepted
 
