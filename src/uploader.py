@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import time
@@ -11,6 +13,10 @@ _ROOT = Path(__file__).resolve().parent.parent
 QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_ROOT / "data" / "upload_queue.json")))
 POLL_SECONDS = int(os.getenv("UPLOADER_POLL_SECONDS", "3"))
 MAX_RETRIES = int(os.getenv("UPLOADER_MAX_RETRIES", "5"))
+
+
+def _log(message: str) -> None:
+    print(f"[uploader] {message}", flush=True)
 
 
 def _read_queue():
@@ -35,31 +41,44 @@ def _dequeue():
 
 
 def _requeue_with_retry(item):
+    session_id = item.get("session_id", "unknown")
     retries = int(item.get("retries", 0)) + 1
     item["retries"] = retries
 
     if retries > MAX_RETRIES:
-        # Dead-letter behavior can be added here.
+        _log(f"dropping session={session_id} after retries={retries - 1} (max={MAX_RETRIES})")
         return
 
     items = _read_queue()
     items.append(item)
     _write_queue(items)
+    _log(f"requeued session={session_id} retries={retries}/{MAX_RETRIES}")
 
 
 def main():
+    _log(
+        f"started queue_file={QUEUE_FILE} poll_seconds={POLL_SECONDS} "
+        f"max_retries={MAX_RETRIES}"
+    )
     while True:
         item = _dequeue()
         if item is None:
             time.sleep(POLL_SECONDS)
             continue
 
+        session_id = item.get("session_id", "unknown")
+        _log(f"processing session={session_id}")
+
         try:
             ok = upload_item(item)
-        except Exception:
+        except Exception as exc:
+            _log(f"upload exception session={session_id}: {exc}")
             ok = False
 
-        if not ok:
+        if ok:
+            _log(f"upload success session={session_id}")
+        else:
+            _log(f"upload failed session={session_id}")
             _requeue_with_retry(item)
 
 

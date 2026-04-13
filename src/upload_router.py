@@ -5,6 +5,10 @@ from typing import Dict, Tuple
 import requests
 
 
+def _log(message: str) -> None:
+    print(f"[upload_router] {message}", flush=True)
+
+
 def _edge_mode() -> str:
     return os.getenv("EDGE_MODE", "production").strip().lower()
 
@@ -54,6 +58,11 @@ def upload_to_api(item: Dict) -> bool:
 
     try:
         response = requests.post(f"{base_url}{path}", files=files, data=data, timeout=timeout)
+        if not response.ok:
+            _log(
+                f"api upload failed status={response.status_code} "
+                f"session={item.get('session_id', 'unknown')}"
+            )
         return response.ok
     finally:
         files["raw"].close()
@@ -81,6 +90,12 @@ def upload_to_roboflow(item: Dict) -> bool:
 
     if not raw_path.exists() or not ir_path.exists():
         raise FileNotFoundError("Capture files not found for Roboflow upload")
+
+    _log(
+        f"roboflow upload session={item.get('session_id', 'unknown')} "
+        f"workspace={workspace} dataset={dataset_name} "
+        f"normal_project={project_normal} ir_project={project_ir}"
+    )
 
     # Upload both images as separate entries, routing WHITE/raw and IR to different projects.
     ok_raw = _upload_file_to_roboflow(
@@ -143,11 +158,22 @@ def _upload_file_to_roboflow(
             files={"file": (image_name, file_obj, "image/jpeg")},
             timeout=int(os.getenv("API_TIMEOUT_SECONDS", "30")),
         )
+    if not response.ok:
+        _log(
+            f"roboflow file upload failed status={response.status_code} "
+            f"project={target_project} file={file_path.name}"
+        )
+    else:
+        _log(f"roboflow file upload ok project={target_project} file={file_path.name}")
     return response.ok
 
 
 def upload_item(item: Dict) -> bool:
     mode, target = resolve_upload_target()
+    _log(
+        f"route mode={mode} target={target} "
+        f"session={item.get('session_id', 'unknown')}"
+    )
 
     if target == "api":
         return upload_to_api(item)
