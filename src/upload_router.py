@@ -170,10 +170,24 @@ def _upload_file_to_roboflow(
                 files={"file": (image_name, file_obj, "image/jpeg")},
                 timeout=int(os.getenv("API_TIMEOUT_SECONDS", "30")),
             )
-        if candidate_response.status_code != 404:
-            response = candidate_response
-            used_endpoint = endpoint
-            break
+        if candidate_response.status_code == 404:
+            continue
+
+        payload_error = ""
+        try:
+            payload = candidate_response.json()
+            if isinstance(payload, dict):
+                payload_error = str(payload.get("error", "")).strip().lower()
+        except ValueError:
+            payload_error = candidate_response.text[:200].strip().lower()
+
+        if "endpoint not found" in payload_error:
+            # Some invalid Roboflow paths return HTTP 200 with an error payload.
+            continue
+
+        response = candidate_response
+        used_endpoint = endpoint
+        break
 
     if response is None:
         # Keep the last response for downstream logging/details.
@@ -184,13 +198,19 @@ def _upload_file_to_roboflow(
     details = ""
     try:
         payload = response.json()
-        # Roboflow commonly returns HTTP 200 with a JSON "success" flag.
-        if "success" in payload:
-            accepted = bool(payload.get("success"))
+        if isinstance(payload, dict):
+            # Explicit API error payloads should always be treated as failure.
+            if payload.get("error"):
+                accepted = False
+            elif "success" in payload:
+                # Roboflow commonly returns HTTP 200 with a JSON "success" flag.
+                accepted = bool(payload.get("success"))
         details = str(payload)[:300]
     except ValueError:
         # Not JSON; keep HTTP status-based acceptance and capture a small body preview.
         details = response.text[:300]
+        if "endpoint not found" in details.lower():
+            accepted = False
 
     if not accepted:
         _log(
