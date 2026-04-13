@@ -39,7 +39,7 @@ do_capture() {
     sleep 0.5               # relay settle
     sleep 5                 # autofocus settle
 
-    rpicam-still -o "$IR_PATH" -t 5000 --ev -2 --gain 2
+    rpicam-still -o "$IR_PATH" -t 5000 --ev -2 --gain 2 --width 640 --height 640
 
     sleep 2
 
@@ -49,7 +49,7 @@ do_capture() {
     sleep 0.5               # relay settle
     sleep 5                 # autofocus settle
 
-    rpicam-still -o "$WHITE_PATH" -t 6000 --ev -1.3 --gain 2
+    rpicam-still -o "$WHITE_PATH" -t 6000 --ev -1.3 --gain 2 --width 640 --height 640
 
     >&2 echo "Capture complete."
 }
