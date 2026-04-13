@@ -32,16 +32,21 @@ launch_kiosk() {
         return 0
     fi
 
-    if ! command -v npx >/dev/null 2>&1; then
-        log_warn "npx not found; skipping kiosk launch"
+    if ! command -v npm >/dev/null 2>&1; then
+        log_warn "npm not found; skipping kiosk launch"
         return 0
     fi
 
-    log_info "Launching Electron kiosk"
+    if [ ! -x "$electron_dir/node_modules/.bin/electron" ]; then
+        log_warn "Electron binary missing at $electron_dir/node_modules/.bin/electron; skipping kiosk launch"
+        return 0
+    fi
+
+    log_info "Launching Electron kiosk (DISPLAY=${DISPLAY:-unset}, XAUTHORITY=${XAUTHORITY:-unset})"
     local electron_log="$SCRIPT_DIR/data/logs/electron.log"
     mkdir -p "$(dirname "$electron_log")"
     (
         cd "$electron_dir" || exit 1
-        ./node_modules/.bin/electron . --no-sandbox >> "$electron_log" 2>&1 &
+        npm run start -- --no-sandbox >> "$electron_log" 2>&1 &
     )
 }

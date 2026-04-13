@@ -49,6 +49,14 @@ start_shell_service "capture" "$SCRIPTS_DIR/capture.sh"
 
 log_section "Electron build"
 ELECTRON_OUT="$SCRIPT_DIR/electron-app/out"
+ELECTRON_NODE_MODULES="$SCRIPT_DIR/electron-app/node_modules"
+if [[ ! -d "$ELECTRON_NODE_MODULES" ]]; then
+    log_info "Electron dependencies missing — installing with npm ci"
+    npm --prefix "$SCRIPT_DIR/electron-app" ci --prefer-offline \
+        || log_fatal "Electron dependency install failed — check npm output above"
+    log_ok "Electron dependencies installed"
+fi
+
 if [[ ! -d "$ELECTRON_OUT" ]]; then
     log_info "No built Electron app found — building now (this may take a few minutes)…"
     npm --prefix "$SCRIPT_DIR/electron-app" run build:linux \
