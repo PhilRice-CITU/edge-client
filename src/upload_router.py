@@ -145,27 +145,47 @@ def _upload_file_to_roboflow(
     project_normal: str,
     project_ir: str,
 ) -> bool:
-    image_name = f"{item.get('device_id', 'device')}_{item.get('session_id', 'session')}_{suffix}.jpg"
-    target_project = _select_roboflow_project(file_path, suffix, project_normal, project_ir)
-    endpoint = (
-        f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload"
-        f"?api_key={api_key}&name={dataset_name}"
+    image_name = (
+        f"{dataset_name}_{item.get('device_id', 'device')}_"
+        f"{item.get('session_id', 'session')}_{suffix}.jpg"
     )
+    target_project = _select_roboflow_project(file_path, suffix, project_normal, project_ir)
+    endpoint = f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload"
+    query_params = {
+        "api_key": api_key,
+        "name": image_name,
+    }
 
     with open(file_path, "rb") as file_obj:
         response = requests.post(
             endpoint,
+            params=query_params,
             files={"file": (image_name, file_obj, "image/jpeg")},
             timeout=int(os.getenv("API_TIMEOUT_SECONDS", "30")),
         )
-    if not response.ok:
+    accepted = response.ok
+    details = ""
+    try:
+        payload = response.json()
+        # Roboflow commonly returns HTTP 200 with a JSON "success" flag.
+        if "success" in payload:
+            accepted = bool(payload.get("success"))
+        details = str(payload)[:300]
+    except ValueError:
+        # Not JSON; keep HTTP status-based acceptance and capture a small body preview.
+        details = response.text[:300]
+
+    if not accepted:
         _log(
             f"roboflow file upload failed status={response.status_code} "
-            f"project={target_project} file={file_path.name}"
+            f"project={target_project} file={file_path.name} image_name={image_name} response={details}"
         )
     else:
-        _log(f"roboflow file upload ok project={target_project} file={file_path.name}")
-    return response.ok
+        _log(
+            f"roboflow file upload accepted status={response.status_code} "
+            f"project={target_project} file={file_path.name} image_name={image_name} response={details}"
+        )
+    return accepted
 
 
 def upload_item(item: Dict) -> bool:
