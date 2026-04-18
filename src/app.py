@@ -30,6 +30,35 @@ def _callback_url(session_id: str) -> str:
     return f"http://{DEVICE_HOST}:{FLASK_PORT}/webhook/result/{session_id}"
 
 
+def _fetch_backend_result_status(result_id: str) -> dict[str, Any] | None:
+    api_base_url = API_BASE_URL.rstrip("/")
+    device_id = os.getenv("DEVICE_ID", "").strip()
+    device_secret = os.getenv("DEVICE_SECRET", "").strip()
+    if not api_base_url or not device_id or not device_secret or not result_id:
+        return None
+
+    path_template = os.getenv(
+        "API_RESULT_STATUS_PATH_TEMPLATE",
+        "/devices/{device_id}/results/{result_id}/status",
+    )
+    path = path_template.format(device_id=device_id, result_id=result_id)
+
+    try:
+        response = http.get(
+            f"{api_base_url}{path}",
+            headers={"X-Device-Secret": device_secret},
+            timeout=API_TIMEOUT,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, dict):
+            return payload
+    except http.exceptions.RequestException:
+        return None
+
+    return None
+
+
 @app.get("/health")
 def health() -> Any:
     return jsonify({"status": "ok"})
@@ -187,6 +216,8 @@ def session_submit(session_id: str) -> Any:
 
     data = {
         "device_id": os.getenv("DEVICE_ID", "pi-001"),
+        "session_id": session_id,
+        "captured_at": session["batches"][-1]["captured_at"],
         "operator_name": session["operator_name"],
         "rice_variety": session.get("rice_variety") or "",
         "batch_name": session.get("operator_name") or "",
@@ -222,6 +253,20 @@ def session_result(session_id: str) -> Any:
     session = session_manager.get_session(session_id)
     if not session:
         return jsonify({"error": "session not found"}), 404
+
+    if session.get("status") != "graded" and session.get("result_id"):
+        backend_status = _fetch_backend_result_status(str(session.get("result_id")))
+        if backend_status:
+            grade = backend_status.get("grade")
+            if grade:
+                updated = session_manager.update_session(
+                    session_id,
+                    status="graded",
+                    result_grade=str(grade),
+                )
+                if updated:
+                    session = updated
+
     return jsonify(
         {
             "status": session["status"],

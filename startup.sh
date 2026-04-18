@@ -85,6 +85,13 @@ else
     log_warn "Skipping command-consumer (requires API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
 fi
 
+log_section "Preview Relay"
+if [[ "${PREVIEW_RELAY_ENABLED:-true}" == "true" && -n "${API_BASE_URL:-}" && -n "${DEVICE_ID:-}" && -n "${DEVICE_SECRET:-}" ]]; then
+    start_python_service "preview-relay" "$APP_DIR/preview_relay.py"
+else
+    log_warn "Skipping preview-relay (requires PREVIEW_RELAY_ENABLED=true plus API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
+fi
+
 log_section "Capture Button Loop"
 start_shell_service "capture" "$SCRIPTS_DIR/capture.sh"
 

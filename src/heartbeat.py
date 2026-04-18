@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
+from event_client import emit_event
 
 API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 API_HEARTBEAT_PATH = os.getenv("API_HEARTBEAT_PATH", "/devices/heartbeat")
@@ -98,12 +99,18 @@ def post_heartbeat() -> None:
 
 
 def main() -> None:
+    was_healthy: Optional[bool] = None
     while True:
         try:
             post_heartbeat()
-        except Exception:
+            if was_healthy is not True:
+                emit_event("INFO", "heartbeat connected", {"interval_seconds": INTERVAL})
+            was_healthy = True
+        except Exception as exc:
+            if was_healthy is not False:
+                emit_event("WARN", "heartbeat failed", {"error": str(exc)})
             # Keep heartbeat worker resilient; errors are expected on unstable networks.
-            pass
+            was_healthy = False
 
         time.sleep(INTERVAL)
 

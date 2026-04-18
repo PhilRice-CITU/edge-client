@@ -5,6 +5,7 @@ import os
 import time
 from pathlib import Path
 
+from event_client import emit_event
 from upload_router import upload_item
 
 # Resolve queue path relative to this file's location so uploader works
@@ -47,6 +48,11 @@ def _requeue_with_retry(item):
 
     if retries > MAX_RETRIES:
         _log(f"dropping session={session_id} after retries={retries - 1} (max={MAX_RETRIES})")
+        emit_event(
+            "ERROR",
+            "upload dropped after max retries",
+            {"session_id": session_id, "max_retries": MAX_RETRIES},
+        )
         return
 
     items = _read_queue()
@@ -59,6 +65,15 @@ def main():
     _log(
         f"started queue_file={QUEUE_FILE} poll_seconds={POLL_SECONDS} "
         f"max_retries={MAX_RETRIES}"
+    )
+    emit_event(
+        "INFO",
+        "uploader started",
+        {
+            "queue_file": str(QUEUE_FILE),
+            "poll_seconds": POLL_SECONDS,
+            "max_retries": MAX_RETRIES,
+        },
     )
     while True:
         item = _dequeue()
@@ -73,12 +88,19 @@ def main():
             ok = upload_item(item)
         except Exception as exc:
             _log(f"upload exception session={session_id}: {exc}")
+            emit_event(
+                "ERROR",
+                "upload exception",
+                {"session_id": session_id, "error": str(exc)},
+            )
             ok = False
 
         if ok:
             _log(f"upload success session={session_id}")
+            emit_event("INFO", "upload success", {"session_id": session_id})
         else:
             _log(f"upload failed session={session_id}")
+            emit_event("WARN", "upload failed", {"session_id": session_id})
             _requeue_with_retry(item)
 
 

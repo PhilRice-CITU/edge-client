@@ -9,6 +9,7 @@ from typing import Any
 import requests
 
 from commands import execute_command
+from event_client import emit_event
 
 API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 DEVICE_ID = os.getenv("DEVICE_ID", "")
@@ -105,6 +106,8 @@ def main() -> None:
         _log("missing API_BASE_URL, DEVICE_ID, or DEVICE_SECRET; consumer disabled")
         return
 
+    emit_event("INFO", "command consumer started", {"poll_seconds": POLL_SECONDS})
+
     seen = deque(maxlen=500)
     failures: dict[str, int] = {}
 
@@ -113,6 +116,7 @@ def main() -> None:
             commands = _fetch_pending()
         except Exception as exc:
             _log(f"poll failed: {exc}")
+            emit_event("WARN", "command poll failed", {"error": str(exc)})
             time.sleep(POLL_SECONDS)
             continue
 
@@ -132,6 +136,15 @@ def main() -> None:
                 if attempt >= MAX_COMMAND_FAILURES:
                     _record_dead_letter(cmd, "status update to processing failed", attempt)
                     _set_status(command_id, "failed")
+                    emit_event(
+                        "ERROR",
+                        "command failed before execution",
+                        {
+                            "command_id": command_id,
+                            "command": cmd.get("command"),
+                            "attempt": attempt,
+                        },
+                    )
                     seen.append(command_id)
                 continue
 
@@ -144,6 +157,15 @@ def main() -> None:
                     _log(f"failed to mark completed command_id={command_id}")
                 failures.pop(command_id, None)
                 seen.append(command_id)
+                emit_event(
+                    "INFO",
+                    "command completed",
+                    {
+                        "command_id": command_id,
+                        "command": cmd.get("command"),
+                        "detail": detail,
+                    },
+                )
             else:
                 failures[command_id] = attempt
                 if attempt < MAX_COMMAND_FAILURES:
@@ -152,12 +174,33 @@ def main() -> None:
                         f"command retry scheduled command_id={command_id} "
                         f"attempt={attempt}/{MAX_COMMAND_FAILURES} detail={detail}"
                     )
+                    emit_event(
+                        "WARN",
+                        "command retry scheduled",
+                        {
+                            "command_id": command_id,
+                            "command": cmd.get("command"),
+                            "attempt": attempt,
+                            "max_failures": MAX_COMMAND_FAILURES,
+                            "detail": detail,
+                        },
+                    )
                     continue
 
                 _record_dead_letter(cmd, detail, attempt)
                 if not _set_status(command_id, "failed"):
                     _log(f"failed to mark failed command_id={command_id}")
                 seen.append(command_id)
+                emit_event(
+                    "ERROR",
+                    "command failed",
+                    {
+                        "command_id": command_id,
+                        "command": cmd.get("command"),
+                        "attempt": attempt,
+                        "detail": detail,
+                    },
+                )
 
             _log(
                 f"command_id={command_id} command={cmd.get('command')} "
