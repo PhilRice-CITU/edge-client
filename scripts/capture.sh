@@ -36,10 +36,10 @@ do_capture() {
     # ── IR Capture ──────────────────────────────────────────────────────────────
     >&2 echo "Switching to IR"
     pinctrl set $RELAY dl   # relay closes → IR illumination active
-    sleep 0.5               # relay settle
-    sleep 5                 # autofocus settle
+    sleep 0.6               # relay settle
+    sleep 7                 # autofocus settle
 
-    rpicam-still -o "$IR_PATH" -t 5000 --ev -2 --gain 4 --shutter 10000 --width 1024 --height 1024
+    rpicam-still -o "$IR_PATH" -t 6500 --ev -3.0 --gain 2.0 --shutter 4500 --width 1024 --height 1024
 
     sleep 2
 
