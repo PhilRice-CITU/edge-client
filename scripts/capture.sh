@@ -30,8 +30,8 @@ WHITE_PATH=""
 do_capture() {
     local TS
     TS=$(date +"%Y%m%d_%H%M%S")
-    IR_PATH="$IMAGE_DIR/IR_${TS}.jpg"
-    WHITE_PATH="$IMAGE_DIR/WHITE_${TS}.jpg"
+    IR_PATH="$IMAGE_DIR/${TS}_ir.jpg"
+    WHITE_PATH="$IMAGE_DIR/${TS}_white.jpg"
 
     # ── IR Capture ──────────────────────────────────────────────────────────────
     >&2 echo "Switching to IR"
