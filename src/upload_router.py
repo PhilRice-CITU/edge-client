@@ -145,10 +145,8 @@ def _upload_file_to_roboflow(
     project_normal: str,
     project_ir: str,
 ) -> bool:
-    image_name = (
-        f"{dataset_name}_{item.get('device_id', 'device')}_"
-        f"{item.get('session_id', 'session')}_{suffix}.jpg"
-    )
+    _ = dataset_name, item
+    image_name = file_path.name
     target_project = _select_roboflow_project(file_path, suffix, project_normal, project_ir)
     endpoint_candidates = [
         f"https://api.roboflow.com/dataset/{workspace}/{target_project}/upload",
