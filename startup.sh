@@ -26,13 +26,22 @@ trap 'release_lock; shutdown_all' EXIT INT TERM
 log_section "Environment"
 load_env "$SCRIPT_DIR/.env"
 apply_defaults
-require_vars API_BASE_URL DEVICE_SECRET
+require_vars API_BASE_URL
+if [[ -z "${DEVICE_SECRET:-}" ]]; then
+    log_warn "DEVICE_SECRET not set — command-consumer will be disabled"
+fi
 
 log_section "Provisioning"
 python3 "$APP_DIR/provision.py" || log_fatal "Device provisioning failed — check .env and API server"
 # Re-source .env so DEVICE_ID written by provision.py is visible to child processes
 load_env "$SCRIPT_DIR/.env"
-require_vars DEVICE_ID
+if [[ -n "${DEVICE_ID:-}" ]]; then
+    log_ok "DEVICE_ID is set"
+elif [[ -n "${REGION_CODE:-}" ]]; then
+    log_fatal "DEVICE_ID missing after headless provisioning — check API_BASE_URL, PROVISION_TOKEN, and REGION_CODE"
+else
+    log_warn "DEVICE_ID not set yet — continuing so setup UI can register this device"
+fi
 
 log_section "Flask"
 start_python_service "flask" "$APP_DIR/app.py"
@@ -45,7 +54,11 @@ log_section "Heartbeat"
 start_python_service "heartbeat" "$APP_DIR/heartbeat.py"
 
 log_section "Command Consumer"
-start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
+if [[ -n "${API_BASE_URL:-}" && -n "${DEVICE_ID:-}" && -n "${DEVICE_SECRET:-}" ]]; then
+    start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
+else
+    log_warn "Skipping command-consumer (requires API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
+fi
 
 log_section "Capture Button Loop"
 start_shell_service "capture" "$SCRIPTS_DIR/capture.sh"
