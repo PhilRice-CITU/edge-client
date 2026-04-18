@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: electron-app
+appId: com.humai.edge
+productName: Hum.ai
 directories:
   buildResources: build
 files:

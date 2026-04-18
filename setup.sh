@@ -10,7 +10,8 @@
 #   2. Creates the Python virtual environment and installs pip deps
 #   3. Installs Electron app node_modules and builds the production bundle
 #   4. Copies .env.example → .env if no .env exists yet
-#   5. Installs the systemd unit (rice-vision.service) and enables it on boot
+#   5. Installs the .desktop launcher for the Pi desktop environment
+#   6. Installs the systemd unit (rice-vision.service) and enables it on boot
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -88,7 +89,25 @@ else
     _green ".env already exists — skipping copy"
 fi
 
-# ── 5. systemd service ────────────────────────────────────────────────────────
+# ── 5. Desktop launcher (.desktop file) ───────────────────────────────────────
+_section "Desktop launcher"
+DESKTOP_DIR="$HOME/.local/share/applications"
+DESKTOP_FILE="$DESKTOP_DIR/rice-vision.desktop"
+mkdir -p "$DESKTOP_DIR"
+cat > "$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Hum.ai
+Comment=Hum.ai rice grain quality grading system
+Exec=$SCRIPT_DIR/startup.sh
+Icon=$SCRIPT_DIR/electron-app/build/icon.png
+Terminal=false
+Categories=Science;
+EOF
+chmod +x "$DESKTOP_FILE"
+_green "Desktop launcher installed at $DESKTOP_FILE"
+
+# ── 6. systemd service ────────────────────────────────────────────────────────
 _section "systemd"
 if [[ ! -f "$SERVICE_FILE" ]]; then
     _red "rice-vision.service not found at $SERVICE_FILE"

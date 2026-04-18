@@ -31,6 +31,31 @@ if [[ -z "${DEVICE_SECRET:-}" ]]; then
     log_warn "DEVICE_SECRET not set — command-consumer will be disabled"
 fi
 
+log_section "Auto-update"
+if git -C "$SCRIPT_DIR" pull --ff-only origin main >> "$LOG_FILE" 2>&1; then
+    log_ok "git pull succeeded — checking for dependency changes"
+
+    # Always force Electron rebuild after a successful pull
+    rm -rf "$SCRIPT_DIR/electron-app/out"
+
+    # Reinstall npm deps only if package-lock.json changed
+    if git -C "$SCRIPT_DIR" diff HEAD@{1} --name-only 2>/dev/null \
+            | grep -q "electron-app/package-lock.json"; then
+        log_info "package-lock.json changed — wiping node_modules for reinstall"
+        rm -rf "$SCRIPT_DIR/electron-app/node_modules"
+    fi
+
+    # Reinstall Python deps only if requirements.txt changed
+    if git -C "$SCRIPT_DIR" diff HEAD@{1} --name-only 2>/dev/null \
+            | grep -q "requirements.txt"; then
+        log_info "requirements.txt changed — reinstalling Python deps"
+        pip install -q -r "$SCRIPT_DIR/requirements.txt" --break-system-packages \
+            || log_warn "pip install failed — continuing with existing deps"
+    fi
+else
+    log_warn "git pull failed (no internet or merge conflict) — booting with current code"
+fi
+
 log_section "Provisioning"
 python3 "$APP_DIR/provision.py" || log_fatal "Device provisioning failed — check .env and API server"
 # Re-source .env so DEVICE_ID written by provision.py is visible to child processes
