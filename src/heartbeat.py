@@ -1,7 +1,9 @@
 import os
+import signal
 import shutil
 import time
 from pathlib import Path
+from threading import Event
 from typing import Optional
 
 import requests
@@ -10,9 +12,18 @@ from event_client import emit_event
 API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 API_HEARTBEAT_PATH = os.getenv("API_HEARTBEAT_PATH", "/devices/heartbeat")
 DEVICE_ID = os.getenv("DEVICE_ID", "pi-001")
-INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "60"))
+INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "15"))
 TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(Path(__file__).resolve().parent.parent / "data" / "upload_queue.json")))
+
+_shutdown_event = Event()
+_shutdown_signal = "unknown"
+
+
+def _handle_shutdown(signum: int, _frame) -> None:
+    global _shutdown_signal
+    _shutdown_signal = signal.Signals(signum).name
+    _shutdown_event.set()
 
 
 def _read_queue_depth() -> Optional[int]:
@@ -99,20 +110,27 @@ def post_heartbeat() -> None:
 
 
 def main() -> None:
-    was_healthy: Optional[bool] = None
-    while True:
-        try:
-            post_heartbeat()
-            if was_healthy is not True:
-                emit_event("INFO", "heartbeat connected", {"interval_seconds": INTERVAL})
-            was_healthy = True
-        except Exception as exc:
-            if was_healthy is not False:
-                emit_event("WARN", "heartbeat failed", {"error": str(exc)})
-            # Keep heartbeat worker resilient; errors are expected on unstable networks.
-            was_healthy = False
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
 
-        time.sleep(INTERVAL)
+    emit_event("INFO", "heartbeat worker started", {"interval_seconds": INTERVAL})
+    was_healthy: Optional[bool] = None
+    try:
+        while not _shutdown_event.is_set():
+            try:
+                post_heartbeat()
+                if was_healthy is not True:
+                    emit_event("INFO", "heartbeat connected", {"interval_seconds": INTERVAL})
+                was_healthy = True
+            except Exception as exc:
+                if was_healthy is not False:
+                    emit_event("WARN", "heartbeat failed", {"error": str(exc)})
+                # Keep heartbeat worker resilient; errors are expected on unstable networks.
+                was_healthy = False
+
+            _shutdown_event.wait(INTERVAL)
+    finally:
+        emit_event("INFO", "heartbeat worker stopped", {"signal": _shutdown_signal})
 
 
 if __name__ == "__main__":

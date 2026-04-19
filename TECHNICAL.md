@@ -40,6 +40,7 @@ The edge client is three layers stacked on top of each other:
 ```
 
 **Why three layers?** So you can test each one independently:
+
 - Bash scripts work without Python or Node.
 - Python services work without Electron.
 - Electron UI works without the Pi hardware (just needs Flask running).
@@ -84,13 +85,13 @@ If any service crashes, the PID disappears. When the main script is killed (Ctrl
 
 Provides five functions:
 
-| Function | Level | Behaviour |
-|----------|-------|-----------|
-| `log_info "msg"` | INFO | Cyan text, also appends to `$LOG_FILE` |
-| `log_ok "msg"` | OK | Green text |
-| `log_warn "msg"` | WARN | Yellow text |
-| `log_error "msg"` | ERROR | Red text |
-| `log_fatal "msg"` | ERROR | Red text, then **`exit 1`** |
+| Function          | Level | Behaviour                              |
+| ----------------- | ----- | -------------------------------------- |
+| `log_info "msg"`  | INFO  | Cyan text, also appends to `$LOG_FILE` |
+| `log_ok "msg"`    | OK    | Green text                             |
+| `log_warn "msg"`  | WARN  | Yellow text                            |
+| `log_error "msg"` | ERROR | Red text                               |
+| `log_fatal "msg"` | ERROR | Red text, then **`exit 1`**            |
 
 Every call writes to both the terminal (with ANSI colours if TTY is detected) and to the log file at `$LOG_DIR/startup.log`.
 
@@ -136,6 +137,7 @@ This script has **two modes**:
 #### Mode 1: `--once` (called by Flask)
 
 When the Electron UI's "Capture" button is pressed:
+
 1. Flask's `/sessions/<id>/capture` endpoint calls `bash capture.sh --once` via `subprocess.run()`.
 2. `do_capture()` runs once: relay → IR → `rpicam-still` → relay → white → `rpicam-still`.
 3. Prints `{"ir_path":"/path/to/IR.jpg","white_path":"/path/to/WHITE.jpg"}` to stdout.
@@ -144,6 +146,7 @@ When the Electron UI's "Capture" button is pressed:
 #### Mode 2: GPIO loop (default, started by `startup.sh`)
 
 Runs forever. Polls GPIO pin 27 every 100ms. When the physical button is pressed (pin reads LOW):
+
 1. Calls `do_capture()`.
 2. Calls `enqueue_capture.py` to add the pair to `upload_queue.json`.
 3. Waits for button release (debounce).
@@ -151,9 +154,9 @@ Runs forever. Polls GPIO pin 27 every 100ms. When the physical button is pressed
 
 #### Hardware details
 
-| Pin | Role | State |
-|-----|------|-------|
-| GPIO 17 (relay) | Output push-pull | `dl` = IR on, `dh` = white on |
+| Pin              | Role               | State                              |
+| ---------------- | ------------------ | ---------------------------------- |
+| GPIO 17 (relay)  | Output push-pull   | `dl` = IR on, `dh` = white on      |
 | GPIO 27 (button) | Input with pull-up | `hi` = not pressed, `lo` = pressed |
 
 The `pinctrl` tool is Raspberry Pi OS specific. On macOS, the script will fail at `pinctrl set` — this is expected.
@@ -168,19 +171,19 @@ The central API that both the Electron UI and the background workers depend on. 
 
 #### Endpoints
 
-| Method | Path | What it does |
-|--------|------|-------------|
-| `GET` | `/health` | Returns `{"status":"ok"}`. Used by `wait_for_flask`. |
-| `GET` | `/mode` | Returns `edge_mode`, `production_upload_target`, `training_upload_target`. |
-| `GET` | `/queue-size` | Counts items in `upload_queue.json`. |
-| `GET` | `/status` | Returns `device_id`, `edge_mode`, `images_on_disk`, `queued_uploads`. Polled by Electron every 5 seconds. |
-| `GET` | `/preview/frame` | Calls `rpicam-still` to grab a single JPEG frame. Returns `image/jpeg` or `503` if camera unavailable. Polled by Electron every 800ms during capture. |
-| `POST` | `/sessions` | Creates a new grading session. Returns the session JSON with status `"capturing"`. |
-| `GET` | `/sessions/<id>` | Returns the session JSON, or `404`. |
-| `PATCH` | `/sessions/<id>` | Updates `operator_name`, `rice_variety`, or `status`. |
-| `POST` | `/sessions/<id>/capture` | Calls `capture.sh --once`, appends the batch to the session. |
-| `POST` | `/sessions/<id>/submit` | Reads all batch images from disk, POSTs them to the cloud API's `/scans/batch` endpoint, sets session status to `"submitted"`. |
-| `POST` | `/webhook/result/<id>` | Called by the cloud API when grading is done. Stores `result_grade`, `dashboard_url`, sets status to `"graded"`. |
+| Method  | Path                     | What it does                                                                                                                                          |
+| ------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`   | `/health`                | Returns `{"status":"ok"}`. Used by `wait_for_flask`.                                                                                                  |
+| `GET`   | `/mode`                  | Returns `edge_mode`, `production_upload_target`, `training_upload_target`.                                                                            |
+| `GET`   | `/queue-size`            | Counts items in `upload_queue.json`.                                                                                                                  |
+| `GET`   | `/status`                | Returns `device_id`, `edge_mode`, `images_on_disk`, `queued_uploads`. Polled by Electron every 5 seconds.                                             |
+| `GET`   | `/preview/frame`         | Calls `rpicam-still` to grab a single JPEG frame. Returns `image/jpeg` or `503` if camera unavailable. Polled by Electron every 800ms during capture. |
+| `POST`  | `/sessions`              | Creates a new grading session. Returns the session JSON with status `"capturing"`.                                                                    |
+| `GET`   | `/sessions/<id>`         | Returns the session JSON, or `404`.                                                                                                                   |
+| `PATCH` | `/sessions/<id>`         | Updates `operator_name`, `rice_variety`, or `status`.                                                                                                 |
+| `POST`  | `/sessions/<id>/capture` | Calls `capture.sh --once`, appends the batch to the session.                                                                                          |
+| `POST`  | `/sessions/<id>/submit`  | Reads all batch images from disk, POSTs them to the cloud API's `/scans/batch` endpoint, sets session status to `"submitted"`.                        |
+| `POST`  | `/webhook/result/<id>`   | Called by the cloud API when grading is done. Stores `result_grade`, `dashboard_url`, sets status to `"graded"`.                                      |
 
 #### Key design decisions
 
@@ -192,14 +195,15 @@ The central API that both the Electron UI and the background workers depend on. 
 
 Pure functions that read and write JSON files in `data/sessions/`.
 
-| Function | Signature | What it does |
-|----------|-----------|-------------|
-| `create_session` | `(mode, operator_name, rice_variety) → dict` | Creates a UUID, writes `data/sessions/{uuid}.json` |
-| `get_session` | `(session_id) → dict \| None` | Reads the JSON file, returns None if missing |
-| `update_session` | `(session_id, **fields) → dict \| None` | Patches arbitrary fields and rewrites the file |
-| `append_batch` | `(session_id, ir_path, white_path) → dict \| None` | Appends to the `batches` array with auto-incrementing `batch_number` |
+| Function         | Signature                                          | What it does                                                         |
+| ---------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
+| `create_session` | `(mode, operator_name, rice_variety) → dict`       | Creates a UUID, writes `data/sessions/{uuid}.json`                   |
+| `get_session`    | `(session_id) → dict \| None`                      | Reads the JSON file, returns None if missing                         |
+| `update_session` | `(session_id, **fields) → dict \| None`            | Patches arbitrary fields and rewrites the file                       |
+| `append_batch`   | `(session_id, ir_path, white_path) → dict \| None` | Appends to the `batches` array with auto-incrementing `batch_number` |
 
 Session JSON structure:
+
 ```json
 {
   "id": "uuid-string",
@@ -229,6 +233,7 @@ Used by the GPIO button loop (not by the kiosk UI). Takes `--raw`, `--ir`, `--se
 ### `src/uploader.py` — Upload Worker
 
 Long-running daemon started by `startup.sh`. Does this in a loop:
+
 1. Pop the first item from `upload_queue.json`.
 2. Call `upload_router.upload_item(item)`.
 3. If it fails, increment `retries` and push to the back of the queue.
@@ -241,16 +246,16 @@ The entire loop body is wrapped in `try/except Exception` so a single bad item c
 
 Reads `EDGE_MODE` to determine where to send images:
 
-| EDGE_MODE | Target var | Destination |
-|-----------|-----------|-------------|
-| `production` | `PRODUCTION_UPLOAD_TARGET=api` | `POST $API_BASE_URL/scans` with multipart files |
-| `training` | `TRAINING_UPLOAD_TARGET=roboflow` | Roboflow upload API |
+| EDGE_MODE    | Target var                        | Destination                                     |
+| ------------ | --------------------------------- | ----------------------------------------------- |
+| `production` | `PRODUCTION_UPLOAD_TARGET=api`    | `POST $API_BASE_URL/scans` with multipart files |
+| `training`   | `TRAINING_UPLOAD_TARGET=roboflow` | Roboflow upload API                             |
 
 Two upload functions: `upload_to_api(item)` and `upload_to_roboflow(item)`. Both return `True`/`False`.
 
 ### `src/heartbeat.py` — Liveness Reporter
 
-Every `HEARTBEAT_INTERVAL_SECONDS` (default 60), POSTs `{"device_id": "...", "status": "online"}` to `$API_BASE_URL/devices/heartbeat`. Swallows all exceptions — it must never crash.
+Every `HEARTBEAT_INTERVAL_SECONDS` (default 15), POSTs `{"device_id": "...", "status": "online"}` to `$API_BASE_URL/devices/heartbeat`. Swallows all exceptions — it must never crash.
 
 ---
 
@@ -268,10 +273,10 @@ electron-app/
 
 These three folders are **isolated security contexts** enforced by Electron:
 
-| Process | Can use | Cannot use |
-|---------|---------|------------|
-| **Main** (Node.js) | `fs`, `child_process`, `electron` APIs | React, DOM |
-| **Preload** (bridge) | `contextBridge`, `ipcRenderer` | Full Node.js, DOM |
+| Process                 | Can use                                     | Cannot use               |
+| ----------------------- | ------------------------------------------- | ------------------------ |
+| **Main** (Node.js)      | `fs`, `child_process`, `electron` APIs      | React, DOM               |
+| **Preload** (bridge)    | `contextBridge`, `ipcRenderer`              | Full Node.js, DOM        |
 | **Renderer** (Chromium) | React, DOM, `window.api`, `window.electron` | Node.js, `fs`, `require` |
 
 The renderer communicates with the main process ONLY through `window.api` (exposed by the preload script via `contextBridge.exposeInMainWorld`).
@@ -279,6 +284,7 @@ The renderer communicates with the main process ONLY through `window.api` (expos
 ### Main Process (`src/main/index.ts`)
 
 What it does:
+
 1. Creates the BrowserWindow. If the primary display is ≤640px wide (Pi touchscreen), enables **kiosk mode** (fullscreen, no frame).
 2. Registers two IPC handlers:
    - `open-external` — opens a URL in the system browser (used by the "View on Dashboard" button).
@@ -288,6 +294,7 @@ What it does:
 ### Preload (`src/preload/index.ts`)
 
 Exposes two things to `window.api`:
+
 ```typescript
 api.openExternal(url: string): Promise<void>
 api.getFlaskUrl(): Promise<string>
@@ -302,6 +309,7 @@ Type declarations are in `src/preload/index.d.ts`.
 The React application that the user interacts with on the touchscreen.
 
 **Tech stack:**
+
 - React 19
 - TypeScript 5.7 (strict mode)
 - TanStack Router (client-side routing)
@@ -356,20 +364,21 @@ src/renderer/src/
 
 #### Routes
 
-| Path | Page | Description |
-|------|------|-------------|
-| `/` | — | Redirects to `/splash` |
-| `/splash` | `SplashPage` | Shows branding, polls `/status`, waits 2s, then navigates to `/home` |
-| `/home` | `HomePage` | Two big buttons: "Grade Rice" and "Training Mode" |
-| `/session/$sessionId` | `SessionPage` | Camera preview, capture button, batch gallery, submit button |
-| `/session/$sessionId/result` | `ResultPage` | Spinner while grading, then grade + dashboard link |
-| `/training` | `TrainingPage` | Shows "GPIO Button Active" notice + queued uploads count |
+| Path                         | Page           | Description                                                          |
+| ---------------------------- | -------------- | -------------------------------------------------------------------- |
+| `/`                          | —              | Redirects to `/splash`                                               |
+| `/splash`                    | `SplashPage`   | Shows branding, polls `/status`, waits 2s, then navigates to `/home` |
+| `/home`                      | `HomePage`     | Two big buttons: "Grade Rice" and "Training Mode"                    |
+| `/session/$sessionId`        | `SessionPage`  | Camera preview, capture button, batch gallery, submit button         |
+| `/session/$sessionId/result` | `ResultPage`   | Spinner while grading, then grade + dashboard link                   |
+| `/training`                  | `TrainingPage` | Shows "GPIO Button Active" notice + queued uploads count             |
 
 #### How the Electron UI talks to Flask
 
 All communication is via `fetch()` to `http://127.0.0.1:5055`. The base URL comes from `lib/constants.ts`.
 
 TanStack Query manages all requests:
+
 - `useQuery` for GET endpoints (automatic polling via `refetchInterval`)
 - `useMutation` for POST/PATCH endpoints (with `onSuccess` cache updates)
 
@@ -451,28 +460,28 @@ heartbeat.py → POST API_BASE_URL/devices/heartbeat every 60s
 
 ## 7. Environment Variables — Complete Reference
 
-| Variable | Default | Used by | Description |
-|----------|---------|---------|-------------|
-| `DEVICE_ID` | `pi-001` | app.py, heartbeat, capture | Unique identifier for this Pi |
-| `DEVICE_SECRET` | *(empty)* | uploader | Auth token (future use) |
-| `API_BASE_URL` | *(required)* | app.py, uploader, heartbeat | Cloud API URL |
-| `API_UPLOAD_PATH` | `/scans` | upload_router | Path appended to API_BASE_URL for uploads |
-| `API_HEARTBEAT_PATH` | `/devices/heartbeat` | heartbeat | Path for heartbeat POSTs |
-| `API_TIMEOUT_SECONDS` | `30` | upload_router, heartbeat | HTTP request timeout |
-| `FLASK_PORT` | `5055` | app.py, Electron main | Local Flask API port |
-| `IMAGE_DIR` | `./data/images` | capture.sh, app.py | Where captured JPEGs are saved |
-| `LOG_DIR` | `/tmp/logs` | all scripts | Log file directory |
-| `DEVICE_HOST` | `192.168.1.100` | app.py | This Pi's LAN IP for grade callbacks |
-| `EDGE_MODE` | `production` | upload_router, app.py | `production` or `training` |
-| `PRODUCTION_UPLOAD_TARGET` | `api` | upload_router | Where production scans go |
-| `TRAINING_UPLOAD_TARGET` | `roboflow` | upload_router | Where training captures go |
-| `ROBOFLOW_API_KEY` | *(empty)* | upload_router | Roboflow auth (training mode) |
-| `ROBOFLOW_WORKSPACE` | *(empty)* | upload_router | Roboflow workspace slug |
-| `ROBOFLOW_PROJECT` | *(empty)* | upload_router | Roboflow project slug |
-| `ROBOFLOW_DATASET_NAME` | `edge-captures` | upload_router | Dataset name on Roboflow |
-| `HEARTBEAT_INTERVAL_SECONDS` | `60` | heartbeat | Seconds between heartbeat POSTs |
-| `UPLOADER_POLL_SECONDS` | `3` | uploader | Seconds between queue polls |
-| `UPLOADER_MAX_RETRIES` | `5` | uploader | Max retries before dropping an item |
+| Variable                     | Default              | Used by                     | Description                               |
+| ---------------------------- | -------------------- | --------------------------- | ----------------------------------------- |
+| `DEVICE_ID`                  | `pi-001`             | app.py, heartbeat, capture  | Unique identifier for this Pi             |
+| `DEVICE_SECRET`              | _(empty)_            | uploader                    | Auth token (future use)                   |
+| `API_BASE_URL`               | _(required)_         | app.py, uploader, heartbeat | Cloud API URL                             |
+| `API_UPLOAD_PATH`            | `/scans`             | upload_router               | Path appended to API_BASE_URL for uploads |
+| `API_HEARTBEAT_PATH`         | `/devices/heartbeat` | heartbeat                   | Path for heartbeat POSTs                  |
+| `API_TIMEOUT_SECONDS`        | `30`                 | upload_router, heartbeat    | HTTP request timeout                      |
+| `FLASK_PORT`                 | `5055`               | app.py, Electron main       | Local Flask API port                      |
+| `IMAGE_DIR`                  | `./data/images`      | capture.sh, app.py          | Where captured JPEGs are saved            |
+| `LOG_DIR`                    | `/tmp/logs`          | all scripts                 | Log file directory                        |
+| `DEVICE_HOST`                | `192.168.1.100`      | app.py                      | This Pi's LAN IP for grade callbacks      |
+| `EDGE_MODE`                  | `production`         | upload_router, app.py       | `production` or `training`                |
+| `PRODUCTION_UPLOAD_TARGET`   | `api`                | upload_router               | Where production scans go                 |
+| `TRAINING_UPLOAD_TARGET`     | `roboflow`           | upload_router               | Where training captures go                |
+| `ROBOFLOW_API_KEY`           | _(empty)_            | upload_router               | Roboflow auth (training mode)             |
+| `ROBOFLOW_WORKSPACE`         | _(empty)_            | upload_router               | Roboflow workspace slug                   |
+| `ROBOFLOW_PROJECT`           | _(empty)_            | upload_router               | Roboflow project slug                     |
+| `ROBOFLOW_DATASET_NAME`      | `edge-captures`      | upload_router               | Dataset name on Roboflow                  |
+| `HEARTBEAT_INTERVAL_SECONDS` | `15`                 | heartbeat                   | Seconds between heartbeat POSTs           |
+| `UPLOADER_POLL_SECONDS`      | `3`                  | uploader                    | Seconds between queue polls               |
+| `UPLOADER_MAX_RETRIES`       | `5`                  | uploader                    | Max retries before dropping an item       |
 
 ---
 
@@ -519,6 +528,7 @@ nano .env  # edit DEVICE_ID, API_BASE_URL, DEVICE_HOST
 ```
 
 `setup.sh` does:
+
 1. `apt-get install` system packages (Python3, Node.js, Electron deps) — skipped on non-ARM
 2. Creates `.venv`, installs `flask` and `requests`
 3. `npm ci` + `npm run build:linux` in `electron-app/`
@@ -589,6 +599,7 @@ rpicam-still -o /tmp/test.jpg -t 1000
 ### Session stuck on "submitted"
 
 The cloud API hasn't called back yet. Check:
+
 1. Is the API server running?
 2. Is `DEVICE_HOST` in `.env` set to this Pi's actual LAN IP?
 3. Is port 5055 reachable from the API server?

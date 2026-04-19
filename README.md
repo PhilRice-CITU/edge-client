@@ -103,20 +103,20 @@ pytest tests/ -v      # 2 files, 19 tests
 
 ### What the tests cover
 
-| Layer | File | Tests |
-|-------|------|-------|
-| Hook | `useDeviceStatus.test.tsx` | Fetch success, connection error, non-200 |
-| Hook | `useSession.test.tsx` | Create, update, submit, disabled-when-null |
-| Hook | `useCapture.test.tsx` | POST + cache update, error state |
-| Molecule | `CaptureButton.test.tsx` | Label states, disabled, onClick |
-| Molecule | `StatusBadge.test.tsx` | Offline, online with device_id |
-| Organism | `BatchGallery.test.tsx` | Empty state, card rendering |
-| Organism | `CameraPreview.test.tsx` | Image renders, 503 fallback, capture overlay |
-| Organism | `ResultCard.test.tsx` | Grade display, batch count, dashboard link |
-| Page | `SplashPage.test.tsx` | Branding, device_id, timer navigation |
-| Page | `HomePage.test.tsx` | Mode buttons, session creation, Flask error |
-| Python | `test_session_manager.py` | CRUD, batch append, unknown-id handling |
-| Python | `test_app.py` | All Flask endpoints, error codes, mock capture |
+| Layer    | File                       | Tests                                          |
+| -------- | -------------------------- | ---------------------------------------------- |
+| Hook     | `useDeviceStatus.test.tsx` | Fetch success, connection error, non-200       |
+| Hook     | `useSession.test.tsx`      | Create, update, submit, disabled-when-null     |
+| Hook     | `useCapture.test.tsx`      | POST + cache update, error state               |
+| Molecule | `CaptureButton.test.tsx`   | Label states, disabled, onClick                |
+| Molecule | `StatusBadge.test.tsx`     | Offline, online with device_id                 |
+| Organism | `BatchGallery.test.tsx`    | Empty state, card rendering                    |
+| Organism | `CameraPreview.test.tsx`   | Image renders, 503 fallback, capture overlay   |
+| Organism | `ResultCard.test.tsx`      | Grade display, batch count, dashboard link     |
+| Page     | `SplashPage.test.tsx`      | Branding, device_id, timer navigation          |
+| Page     | `HomePage.test.tsx`        | Mode buttons, session creation, Flask error    |
+| Python   | `test_session_manager.py`  | CRUD, batch append, unknown-id handling        |
+| Python   | `test_app.py`              | All Flask endpoints, error codes, mock capture |
 
 ---
 
@@ -124,14 +124,14 @@ pytest tests/ -v      # 2 files, 19 tests
 
 All variables live in `.env` (copied from `.env.example`). The critical ones:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `DEVICE_ID` | `pi-001` | Identifies this Pi to the API server |
-| `API_BASE_URL` | *(required)* | Cloud API server URL |
-| `FLASK_PORT` | `5055` | Port for the local Flask API |
-| `DEVICE_HOST` | `192.168.1.100` | This Pi's LAN IP — used for grade callbacks |
-| `EDGE_MODE` | `production` or `training` | Controls upload destination |
-| `DEVICE_SECRET` | *(empty)* | Auth token for API server |
+| Variable        | Default                    | Purpose                                     |
+| --------------- | -------------------------- | ------------------------------------------- |
+| `DEVICE_ID`     | `pi-001`                   | Identifies this Pi to the API server        |
+| `API_BASE_URL`  | _(required)_               | Cloud API server URL                        |
+| `FLASK_PORT`    | `5055`                     | Port for the local Flask API                |
+| `DEVICE_HOST`   | `192.168.1.100`            | This Pi's LAN IP — used for grade callbacks |
+| `EDGE_MODE`     | `production` or `training` | Controls upload destination                 |
+| `DEVICE_SECRET` | _(empty)_                  | Auth token for API server                   |
 
 See [`.env.example`](.env.example) for the full list with comments.
 
@@ -162,7 +162,7 @@ See [`.env.example`](.env.example) for the full list with comments.
 
 Background workers (started by startup.sh):
   ├── src/uploader.py      — polls upload_queue.json, routes to API or Roboflow
-  ├── src/heartbeat.py     — sends liveness POST every 60s
+  ├── src/heartbeat.py     — sends liveness POST every 15s (default)
   └── scripts/capture.sh   — GPIO button polling loop (Pi only)
 ```
 
@@ -215,14 +215,14 @@ edge-client/
 
 ## Common Issues
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| "Grade Rice" shows Flask error | Flask not running | `source .venv/bin/activate && python3 src/app.py` |
-| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop) | Expected on macOS; camera works on Pi only |
-| Electron shows blank white screen | `npm run dev` not started | Run `npm run dev` inside `electron-app/` |
-| `startup.sh` exits immediately | Missing `DEVICE_ID` or `API_BASE_URL` | Edit `.env` with real values |
-| Port 5055 already in use | Another Flask instance running | `lsof -i :5055` and kill it |
-| Tests fail with module not found | Missing dependencies | `pip install flask requests` / `npm install` |
+| Symptom                                 | Cause                                 | Fix                                               |
+| --------------------------------------- | ------------------------------------- | ------------------------------------------------- |
+| "Grade Rice" shows Flask error          | Flask not running                     | `source .venv/bin/activate && python3 src/app.py` |
+| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop)     | Expected on macOS; camera works on Pi only        |
+| Electron shows blank white screen       | `npm run dev` not started             | Run `npm run dev` inside `electron-app/`          |
+| `startup.sh` exits immediately          | Missing `DEVICE_ID` or `API_BASE_URL` | Edit `.env` with real values                      |
+| Port 5055 already in use                | Another Flask instance running        | `lsof -i :5055` and kill it                       |
+| Tests fail with module not found        | Missing dependencies                  | `pip install flask requests` / `npm install`      |
 
 ---
 

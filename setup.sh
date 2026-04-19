@@ -55,7 +55,7 @@ if [[ ! -d "$VENV" ]]; then
 fi
 source "$VENV/bin/activate"
 pip install --quiet --upgrade pip
-pip install --quiet flask flask-cors requests
+pip install --quiet flask flask-cors requests websocket-client
 _green "Python dependencies installed"
 
 # ── 3. Node.js + Electron app ─────────────────────────────────────────────────

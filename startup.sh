@@ -80,9 +80,19 @@ start_python_service "heartbeat" "$APP_DIR/heartbeat.py"
 
 log_section "Command Consumer"
 if [[ -n "${API_BASE_URL:-}" && -n "${DEVICE_ID:-}" && -n "${DEVICE_SECRET:-}" ]]; then
-    start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
+    if [[ "${COMMAND_WS_ENABLED:-false}" == "true" ]]; then
+        start_python_service "websocket-command-client" "$APP_DIR/websocket_command_client.py"
+
+        if [[ "${COMMAND_POLL_FALLBACK_ENABLED:-false}" == "true" ]]; then
+            start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
+        else
+            log_info "Command polling fallback disabled while websocket client is enabled"
+        fi
+    else
+        start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
+    fi
 else
-    log_warn "Skipping command-consumer (requires API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
+    log_warn "Skipping command processing workers (requires API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
 fi
 
 log_section "Preview Relay"
