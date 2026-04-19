@@ -132,6 +132,18 @@ def _process_command(
     if not command_id or command_id in seen:
         return
 
+    command_name = str(command.get("command", ""))
+    if command_name == "capture":
+        emit_event(
+            "INFO",
+            "capture task received",
+            {
+                "command_id": command_id,
+                "command": command_name,
+                "source": "ws-command-client",
+            },
+        )
+
     attempt = failures.get(command_id, 0) + 1
 
     if websocket is not None:

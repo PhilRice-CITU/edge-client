@@ -125,6 +125,18 @@ def main() -> None:
             if not command_id or command_id in seen:
                 continue
 
+            command_name = str(cmd.get("command", ""))
+            if command_name == "capture":
+                emit_event(
+                    "INFO",
+                    "capture task received",
+                    {
+                        "command_id": command_id,
+                        "command": command_name,
+                        "source": "command-consumer",
+                    },
+                )
+
             attempt = failures.get(command_id, 0) + 1
 
             if not _set_status(command_id, "processing"):
