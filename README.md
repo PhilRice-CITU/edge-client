@@ -124,14 +124,15 @@ pytest tests/ -v      # 2 files, 19 tests
 
 All variables live in `.env` (copied from `.env.example`). The critical ones:
 
-| Variable        | Default                    | Purpose                                     |
-| --------------- | -------------------------- | ------------------------------------------- |
-| `DEVICE_ID`     | `pi-001`                   | Identifies this Pi to the API server        |
-| `API_BASE_URL`  | _(required)_               | Cloud API server URL                        |
-| `FLASK_PORT`    | `5055`                     | Port for the local Flask API                |
-| `DEVICE_HOST`   | `192.168.1.100`            | This Pi's LAN IP — used for grade callbacks |
-| `EDGE_MODE`     | `production` or `training` | Controls upload destination                 |
-| `DEVICE_SECRET` | _(empty)_                  | Auth token for API server                   |
+| Variable                      | Default                    | Purpose                                       |
+| ----------------------------- | -------------------------- | --------------------------------------------- |
+| `DEVICE_ID`                   | `pi-001`                   | Identifies this Pi to the API server          |
+| `API_BASE_URL`                | _(required)_               | Cloud API server URL                          |
+| `FLASK_PORT`                  | `5055`                     | Port for the local Flask API                  |
+| `DEVICE_HOST`                 | `192.168.1.100`            | This Pi's LAN IP — used for grade callbacks   |
+| `EDGE_MODE`                   | `production` or `training` | Controls upload destination                   |
+| `DEVICE_SECRET`               | _(empty)_                  | Auth token for API server                     |
+| `MQTT_CAMERA_MAX_FRAME_BYTES` | `250000`                   | Drops oversized preview frames before publish |
 
 See [`.env.example`](.env.example) for the full list with comments.
 

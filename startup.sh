@@ -28,7 +28,7 @@ load_env "$SCRIPT_DIR/.env"
 apply_defaults
 require_vars API_BASE_URL
 if [[ -z "${DEVICE_SECRET:-}" ]]; then
-    log_warn "DEVICE_SECRET not set — command-consumer will be disabled"
+    log_warn "DEVICE_SECRET not set"
 fi
 
 log_section "Auto-update"
@@ -75,31 +75,11 @@ wait_for_flask "${FLASK_PORT:-5000}"
 log_section "Uploader"
 start_python_service "uploader" "$APP_DIR/uploader.py"
 
-log_section "Heartbeat"
-start_python_service "heartbeat" "$APP_DIR/heartbeat.py"
-
-log_section "Command Consumer"
-if [[ -n "${API_BASE_URL:-}" && -n "${DEVICE_ID:-}" && -n "${DEVICE_SECRET:-}" ]]; then
-    if [[ "${COMMAND_WS_ENABLED:-false}" == "true" ]]; then
-        start_python_service "websocket-command-client" "$APP_DIR/websocket_command_client.py"
-
-        if [[ "${COMMAND_POLL_FALLBACK_ENABLED:-false}" == "true" ]]; then
-            start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
-        else
-            log_info "Command polling fallback disabled while websocket client is enabled"
-        fi
-    else
-        start_python_service "command-consumer" "$APP_DIR/command_consumer.py"
-    fi
+log_section "MQTT Agent"
+if [[ "${MQTT_ENABLED:-false}" == "true" ]]; then
+    start_python_service "mqtt-agent" "$APP_DIR/mqtt_agent.py"
 else
-    log_warn "Skipping command processing workers (requires API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
-fi
-
-log_section "Preview Relay"
-if [[ "${PREVIEW_RELAY_ENABLED:-true}" == "true" && -n "${API_BASE_URL:-}" && -n "${DEVICE_ID:-}" && -n "${DEVICE_SECRET:-}" ]]; then
-    start_python_service "preview-relay" "$APP_DIR/preview_relay.py"
-else
-    log_warn "Skipping preview-relay (requires PREVIEW_RELAY_ENABLED=true plus API_BASE_URL, DEVICE_ID, DEVICE_SECRET)"
+    log_warn "Skipping mqtt-agent because MQTT_ENABLED is false"
 fi
 
 log_section "Capture Button Loop"
