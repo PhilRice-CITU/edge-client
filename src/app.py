@@ -10,6 +10,7 @@ import requests as http
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 
+from event_client import emit_event
 import provision as _provision
 import session_manager
 
@@ -24,6 +25,27 @@ API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
 DEVICE_HOST = os.getenv("DEVICE_HOST", "127.0.0.1")
 CAPTURE_SCRIPT = _ROOT / "scripts" / "capture.sh"
+
+
+def _is_grade_mode(session: dict[str, Any] | None) -> bool:
+    return bool(session and str(session.get("mode", "")).strip().lower() == "grade")
+
+
+def _emit_grade_event(
+    *,
+    level: str,
+    message: str,
+    session: dict[str, Any] | None = None,
+    session_id: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> None:
+    if not _is_grade_mode(session):
+        return
+
+    payload = dict(meta or {})
+    payload["session_id"] = session_id or str(session.get("id", ""))
+    payload["mode"] = "grade"
+    emit_event(level, message, payload)
 
 
 def _callback_url(session_id: str) -> str:
@@ -141,6 +163,15 @@ def create_session() -> Any:
     operator_name = body.get("operator_name", "")
     rice_variety = body.get("rice_variety")
     session = session_manager.create_session(mode, operator_name, rice_variety)
+    _emit_grade_event(
+        level="INFO",
+        message="grade session created",
+        session=session,
+        meta={
+            "operator_name": operator_name,
+            "rice_variety": rice_variety or "",
+        },
+    )
     return jsonify(session), 201
 
 
@@ -157,16 +188,33 @@ def patch_session(session_id: str) -> Any:
     body = request.get_json() or {}
     allowed = {"operator_name", "rice_variety", "status"}
     fields = {k: v for k, v in body.items() if k in allowed}
+    existing = session_manager.get_session(session_id)
     updated = session_manager.update_session(session_id, **fields)
     if not updated:
         return jsonify({"error": "session not found"}), 404
+
+    _emit_grade_event(
+        level="INFO",
+        message="grade session updated",
+        session=existing,
+        session_id=session_id,
+        meta={"fields": fields},
+    )
     return jsonify(updated)
 
 
 @app.post("/sessions/<session_id>/capture")
 def session_capture(session_id: str) -> Any:
-    if not session_manager.get_session(session_id):
+    session = session_manager.get_session(session_id)
+    if not session:
         return jsonify({"error": "session not found"}), 404
+
+    _emit_grade_event(
+        level="INFO",
+        message="grade capture requested",
+        session=session,
+        session_id=session_id,
+    )
 
     try:
         result = subprocess.run(
@@ -176,22 +224,65 @@ def session_capture(session_id: str) -> Any:
             timeout=60,
         )
     except subprocess.TimeoutExpired:
+        _emit_grade_event(
+            level="ERROR",
+            message="grade capture timed out",
+            session=session,
+            session_id=session_id,
+            meta={"timeout_seconds": 60},
+        )
         return jsonify({"error": "capture timed out after 60s"}), 504
 
     if result.returncode != 0:
+        _emit_grade_event(
+            level="ERROR",
+            message="grade capture script failed",
+            session=session,
+            session_id=session_id,
+            meta={
+                "return_code": result.returncode,
+                "stderr_tail": result.stderr[-500:],
+            },
+        )
         return jsonify({"error": "capture script failed", "detail": result.stderr[-500:]}), 500
 
     try:
         capture_data = json.loads(result.stdout.strip())
     except json.JSONDecodeError:
+        _emit_grade_event(
+            level="ERROR",
+            message="grade capture output invalid json",
+            session=session,
+            session_id=session_id,
+            meta={"stdout_head": result.stdout[:200]},
+        )
         return jsonify({"error": "invalid capture output", "raw": result.stdout[:200]}), 500
 
     ir_path = capture_data.get("ir_path")
     white_path = capture_data.get("white_path")
     if not ir_path or not white_path:
+        _emit_grade_event(
+            level="ERROR",
+            message="grade capture output missing paths",
+            session=session,
+            session_id=session_id,
+            meta={"capture_data": capture_data},
+        )
         return jsonify({"error": "capture output missing paths"}), 500
 
     updated = session_manager.append_batch(session_id, ir_path, white_path)
+    batch_number = len(updated.get("batches", [])) if updated else None
+    _emit_grade_event(
+        level="INFO",
+        message="grade capture stored",
+        session=session,
+        session_id=session_id,
+        meta={
+            "batch_number": batch_number,
+            "ir_path": ir_path,
+            "white_path": white_path,
+        },
+    )
     return jsonify(updated)
 
 
@@ -200,9 +291,31 @@ def session_submit(session_id: str) -> Any:
     session = session_manager.get_session(session_id)
     if not session:
         return jsonify({"error": "session not found"}), 404
+
+    _emit_grade_event(
+        level="INFO",
+        message="grade submit requested",
+        session=session,
+        session_id=session_id,
+        meta={"batch_count": len(session.get("batches", []))},
+    )
+
     if session["status"] != "capturing":
+        _emit_grade_event(
+            level="WARN",
+            message="grade submit skipped due to session status",
+            session=session,
+            session_id=session_id,
+            meta={"status": session.get("status")},
+        )
         return jsonify({"error": f"session is already {session['status']}"}), 409
     if not session["batches"]:
+        _emit_grade_event(
+            level="WARN",
+            message="grade submit skipped with no batches",
+            session=session,
+            session_id=session_id,
+        )
         return jsonify({"error": "no batches captured yet"}), 400
 
     files: list[tuple[str, tuple[str, bytes, str]]] = []
@@ -210,6 +323,17 @@ def session_submit(session_id: str) -> Any:
         ir_file = Path(batch["ir_path"])
         raw_file = Path(batch["white_path"])
         if not ir_file.exists() or not raw_file.exists():
+            _emit_grade_event(
+                level="ERROR",
+                message="grade submit missing batch files",
+                session=session,
+                session_id=session_id,
+                meta={
+                    "batch_number": batch["batch_number"],
+                    "ir_exists": ir_file.exists(),
+                    "raw_exists": raw_file.exists(),
+                },
+            )
             return jsonify({"error": f"batch {batch['batch_number']} images missing from disk"}), 400
         files.append(("ir_images", (ir_file.name, ir_file.read_bytes(), "image/jpeg")))
         files.append(("raw_images", (raw_file.name, raw_file.read_bytes(), "image/jpeg")))
@@ -241,10 +365,24 @@ def session_submit(session_id: str) -> Any:
         resp.raise_for_status()
         result_data = resp.json()
     except http.exceptions.RequestException as exc:
+        _emit_grade_event(
+            level="ERROR",
+            message="grade submit failed reaching api",
+            session=session,
+            session_id=session_id,
+            meta={"error": str(exc)},
+        )
         return jsonify({"error": "API server unreachable", "detail": str(exc)}), 502
 
     result_id = result_data.get("id")
     session_manager.update_session(session_id, status="submitted", result_id=result_id)
+    _emit_grade_event(
+        level="INFO",
+        message="grade submit accepted",
+        session=session,
+        session_id=session_id,
+        meta={"result_id": result_id},
+    )
     return jsonify({"result_id": result_id})
 
 
@@ -266,6 +404,16 @@ def session_result(session_id: str) -> Any:
                 )
                 if updated:
                     session = updated
+                    _emit_grade_event(
+                        level="INFO",
+                        message="grade result resolved from backend",
+                        session=session,
+                        session_id=session_id,
+                        meta={
+                            "result_id": session.get("result_id"),
+                            "grade": str(grade),
+                        },
+                    )
 
     return jsonify(
         {
@@ -279,12 +427,23 @@ def session_result(session_id: str) -> Any:
 
 @app.post("/webhook/result/<session_id>")
 def webhook_result(session_id: str) -> Any:
+    existing = session_manager.get_session(session_id)
     body = request.get_json() or {}
     session_manager.update_session(
         session_id,
         status="graded",
         result_grade=body.get("grade"),
         dashboard_url=body.get("dashboard_url"),
+    )
+    _emit_grade_event(
+        level="INFO",
+        message="grade result webhook received",
+        session=existing,
+        session_id=session_id,
+        meta={
+            "grade": body.get("grade"),
+            "dashboard_url": body.get("dashboard_url"),
+        },
     )
     return jsonify({"ok": True})
 
