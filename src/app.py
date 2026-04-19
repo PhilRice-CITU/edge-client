@@ -45,7 +45,19 @@ def _emit_grade_event(
     payload = dict(meta or {})
     payload["session_id"] = session_id or str(session.get("id", ""))
     payload["mode"] = "grade"
-    emit_event(level, message, payload)
+    print(
+        f"[grade-session] level={level} message={message} "
+        f"session_id={payload['session_id']}",
+        flush=True,
+    )
+
+    published = emit_event(level, message, payload)
+    if not published:
+        print(
+            f"[grade-session] remote event publish failed message={message} "
+            f"session_id={payload['session_id']}",
+            flush=True,
+        )
 
 
 def _callback_url(session_id: str) -> str:
@@ -205,8 +217,11 @@ def patch_session(session_id: str) -> Any:
 
 @app.post("/sessions/<session_id>/capture")
 def session_capture(session_id: str) -> Any:
+    print(f"[grade-session] capture request received session_id={session_id}", flush=True)
+
     session = session_manager.get_session(session_id)
     if not session:
+        print(f"[grade-session] capture request missing session session_id={session_id}", flush=True)
         return jsonify({"error": "session not found"}), 404
 
     _emit_grade_event(
