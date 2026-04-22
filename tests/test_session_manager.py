@@ -43,6 +43,9 @@ def test_create_session_returns_session_dict(sm, sessions_dir):
     assert session["rice_variety"] == "Sinandomeng"
     assert session["status"] == "capturing"
     assert session["batches"] == []
+    assert "result_id" not in session
+    assert "result_grade" not in session
+    assert "dashboard_url" not in session
     assert "id" in session
 
 

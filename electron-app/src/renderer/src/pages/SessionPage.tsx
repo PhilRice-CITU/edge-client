@@ -22,6 +22,7 @@ export function SessionPage() {
   const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [operatorName, setOperatorName] = useState('')
   const [riceVariety, setRiceVariety] = useState('')
+  const [uploadSent, setUploadSent] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -40,6 +41,7 @@ export function SessionPage() {
     if (submitting || !session?.batches.length) return
     setSubmitting(true)
     setSubmitError(null)
+    setUploadSent(false)
     setUploadStep('saving')
 
     try {
@@ -56,7 +58,8 @@ export function SessionPage() {
     setUploadStep('uploading')
     try {
       await submitSession.mutateAsync()
-      navigate({ to: '/session/$sessionId/result', params: { sessionId } })
+      setSubmitting(false)
+      setUploadSent(true)
     } catch {
       setSubmitError('Upload failed. Check your connection and try again.')
       setSubmitting(false)
@@ -73,6 +76,22 @@ export function SessionPage() {
 
   if (submitting) {
     return <UploadProgress batchCount={session?.batches.length ?? 0} step={uploadStep} />
+  }
+
+  if (uploadSent) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 text-center">
+          <p className="text-lg font-semibold text-foreground">Upload Sent</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Session data was uploaded successfully. Please check the dashboard for grading results.
+          </p>
+        </div>
+        <KioskButton onClick={() => navigate({ to: '/home' })} variant="primary">
+          Back to Home
+        </KioskButton>
+      </div>
+    )
   }
 
   const batchCount = session?.batches.length ?? 0

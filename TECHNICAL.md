@@ -183,13 +183,12 @@ The central API that both the Electron UI and the background workers depend on. 
 | `PATCH` | `/sessions/<id>`         | Updates `operator_name`, `rice_variety`, or `status`.                                                                                                 |
 | `POST`  | `/sessions/<id>/capture` | Calls `capture.sh --once`, appends the batch to the session.                                                                                          |
 | `POST`  | `/sessions/<id>/submit`  | Reads all batch images from disk, POSTs them to the cloud API's `/scans/batch` endpoint, sets session status to `"submitted"`.                        |
-| `POST`  | `/webhook/result/<id>`   | Called by the cloud API when grading is done. Stores `result_grade`, `dashboard_url`, sets status to `"graded"`.                                      |
 
 #### Key design decisions
 
 - **Stateless**: Every request reads from disk (session JSON files). No in-memory caches. This means if Flask restarts, all sessions survive.
 - **`import requests as http`**: Aliased to avoid conflict with Flask's `request` object.
-- **Callback URL**: When submitting to the cloud, the callback URL is `http://{DEVICE_HOST}:{FLASK_PORT}/webhook/result/{session_id}`. The cloud API calls this back with the grade.
+- **Dashboard-owned results**: After upload submission, grading results are viewed in the web dashboard instead of the kiosk.
 
 ### `src/session_manager.py` — Session CRUD
 
@@ -219,9 +218,6 @@ Session JSON structure:
     }
   ],
   "status": "capturing",
-  "result_id": null,
-  "result_grade": null,
-  "dashboard_url": null,
   "created_at": "2026-04-05T12:00:00+00:00"
 }
 ```
@@ -352,13 +348,12 @@ src/renderer/src/
 │       ├── BatchGallery.tsx  ←   Grid of BatchCards, empty state fallback
 │       ├── CameraPreview.tsx ←   Polls /preview/frame, shows live JPEG stream
 │       ├── UploadProgress.tsx ←  Spinner shown during submission
-│       └── ResultCard.tsx    ←   Grade display + "View on Dashboard" button
+│       └── ResultCard.tsx    ←   Reusable grade card component (not part of kiosk submit flow)
 │
 └── pages/                    ← Full-screen page components, one per route
     ├── SplashPage.tsx        ←   2s splash + waits for /status, then → /home
     ├── HomePage.tsx          ←   "Grade Rice" / "Training Mode" selection
     ├── SessionPage.tsx       ←   Camera preview + capture + batch gallery + submit
-    ├── ResultPage.tsx        ←   Polls session until graded, shows ResultCard
     └── TrainingPage.tsx      ←   Info screen for GPIO training mode
 ```
 
@@ -370,7 +365,6 @@ src/renderer/src/
 | `/splash`                    | `SplashPage`   | Shows branding, polls `/status`, waits 2s, then navigates to `/home` |
 | `/home`                      | `HomePage`     | Two big buttons: "Grade Rice" and "Training Mode"                    |
 | `/session/$sessionId`        | `SessionPage`  | Camera preview, capture button, batch gallery, submit button         |
-| `/session/$sessionId/result` | `ResultPage`   | Spinner while grading, then grade + dashboard link                   |
 | `/training`                  | `TrainingPage` | Shows "GPIO Button Active" notice + queued uploads count             |
 
 #### How the Electron UI talks to Flask
@@ -409,14 +403,9 @@ User taps "Submit for Grading"
   → useSubmitSession.mutateAsync()
   → POST /sessions/$id/submit
   → Flask reads all batch images from disk
-  → Flask POSTs multipart form to API_BASE_URL/scans/batch (with callback URL)
-  → Navigate to /session/$id/result
-
-ResultPage polls GET /sessions/$id every 2s
-  → When API finishes grading, it POSTs to /webhook/result/$id
-  → Flask updates session JSON: status="graded", result_grade="Grade 1"
-  → Next poll returns the graded session
-  → ResultCard shows the grade + "View on Dashboard" link
+  → Flask POSTs multipart form to API_BASE_URL/scans/batch
+  → SessionPage shows "Upload sent" confirmation
+  → Operator checks grading result in web dashboard
 ```
 
 ---
@@ -429,12 +418,10 @@ ResultPage polls GET /sessions/$id every 2s
 Electron UI → Flask:5055 → capture.sh --once → camera hardware
                          → data/sessions/uuid.json
                          → API server /scans/batch
-                                ↓
-                           AI grading
-                                ↓
-                         → Flask:5055 /webhook/result/uuid
-                         → session updated (status=graded)
-                         → Electron polls & displays grade
+              ↓
+            AI grading
+              ↓
+            Dashboard displays final result
 ```
 
 ### Training flow (physical button)
@@ -471,7 +458,6 @@ heartbeat.py → POST API_BASE_URL/devices/heartbeat every 60s
 | `FLASK_PORT`                 | `5055`               | app.py, Electron main       | Local Flask API port                      |
 | `IMAGE_DIR`                  | `./data/images`      | capture.sh, app.py          | Where captured JPEGs are saved            |
 | `LOG_DIR`                    | `/tmp/logs`          | all scripts                 | Log file directory                        |
-| `DEVICE_HOST`                | `192.168.1.100`      | app.py                      | This Pi's LAN IP for grade callbacks      |
 | `EDGE_MODE`                  | `production`         | upload_router, app.py       | `production` or `training`                |
 | `PRODUCTION_UPLOAD_TARGET`   | `api`                | upload_router               | Where production scans go                 |
 | `TRAINING_UPLOAD_TARGET`     | `roboflow`           | upload_router               | Where training captures go                |
@@ -524,7 +510,7 @@ git clone <repo-url> ~/rice-vision
 cd ~/rice-vision/edge-client
 chmod +x setup.sh
 ./setup.sh
-nano .env  # edit DEVICE_ID, API_BASE_URL, DEVICE_HOST
+nano .env  # edit DEVICE_ID, API_BASE_URL
 ```
 
 `setup.sh` does:
@@ -596,21 +582,14 @@ rpicam-still -o /tmp/test.jpg -t 1000
 # If this fails, run: sudo raspi-config → Interface Options → Camera → Enable
 ```
 
-### Session stuck on "submitted"
+### Session shows "submitted"
 
-The cloud API hasn't called back yet. Check:
+This is expected in upload-only mode. It means the edge device already sent the batch to the API.
 
-1. Is the API server running?
-2. Is `DEVICE_HOST` in `.env` set to this Pi's actual LAN IP?
-3. Is port 5055 reachable from the API server?
-4. Check the API server logs for the `/scans/batch` request.
+Next steps:
 
-```bash
-# Manually test the callback:
-curl -X POST http://localhost:5055/webhook/result/<session-id> \
-  -H 'Content-Type: application/json' \
-  -d '{"grade":"Grade 1","metrics":{},"dashboard_url":"https://..."}'
-```
+1. Check dashboard for grading result.
+2. If result is missing there, inspect API server logs for the `/scans` or `/scans/batch` request.
 
 ### Upload queue keeps growing
 

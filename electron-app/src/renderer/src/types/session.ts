@@ -1,6 +1,6 @@
 export type SessionMode = 'grade' | 'train'
 
-export type SessionStatus = 'capturing' | 'submitted' | 'graded' | 'failed'
+export type SessionStatus = 'capturing' | 'submitted' | 'failed'
 
 export interface Batch {
   batch_number: number
@@ -16,9 +16,6 @@ export interface Session {
   rice_variety: string | null
   batches: Batch[]
   status: SessionStatus
-  result_id: string | null
-  result_grade: string | null
-  dashboard_url: string | null
   created_at: string
 }
 

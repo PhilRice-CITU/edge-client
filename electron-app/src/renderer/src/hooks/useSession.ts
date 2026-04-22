@@ -14,7 +14,7 @@ export function useSession(sessionId: string | null) {
     // Stop polling once the session reaches a terminal state
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      if (status === 'graded' || status === 'failed') return false
+      if (status === 'submitted' || status === 'failed') return false
       return SESSION_POLL_INTERVAL
     },
     staleTime: 1_000,

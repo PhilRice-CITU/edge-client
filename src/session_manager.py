@@ -39,9 +39,6 @@ def create_session(
         "rice_variety": rice_variety,
         "batches": [],
         "status": "capturing",
-        "result_id": None,
-        "result_grade": None,
-        "dashboard_url": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     _save(session)

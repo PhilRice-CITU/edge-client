@@ -19,9 +19,6 @@ const mockSession: Session = {
   rice_variety: null,
   status: 'capturing',
   batches: [{ batch_number: 1, ir_path: '/tmp/ir.jpg', white_path: '/tmp/white.jpg', captured_at: '2026-01-01T00:00:00Z' }],
-  result_id: null,
-  result_grade: null,
-  dashboard_url: null,
   created_at: '2025-01-01T00:00:00Z',
 }
 

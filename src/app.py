@@ -24,7 +24,6 @@ IMAGE_DIR = Path(os.getenv("IMAGE_DIR", str(_ROOT / "data" / "images")))
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3001")
 API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
-DEVICE_HOST = os.getenv("DEVICE_HOST", "127.0.0.1")
 CAPTURE_SCRIPT = _ROOT / "scripts" / "capture.sh"
 CAPTURE_LOCK_FILE = Path(os.getenv("CAPTURE_LOCK_FILE", "/tmp/edge-capture.lock"))
 PREVIEW_FRAME_TIMEOUT_SECONDS = int(os.getenv("PREVIEW_FRAME_TIMEOUT_SECONDS", "6"))
@@ -61,10 +60,6 @@ def _emit_grade_event(
             f"session_id={payload['session_id']}",
             flush=True,
         )
-
-
-def _callback_url(session_id: str) -> str:
-    return f"http://{DEVICE_HOST}:{FLASK_PORT}/webhook/result/{session_id}"
 
 
 def _capture_lock_pid() -> int | None:
@@ -471,7 +466,6 @@ def session_submit(session_id: str) -> Any:
                 for b in session["batches"]
             ]
         ),
-        "callback_url": _callback_url(session_id),
     }
 
     try:
@@ -494,7 +488,7 @@ def session_submit(session_id: str) -> Any:
         return jsonify({"error": "API server unreachable", "detail": str(exc)}), 502
 
     result_id = result_data.get("id")
-    session_manager.update_session(session_id, status="submitted", result_id=result_id)
+    session_manager.update_session(session_id, status="submitted")
     _emit_grade_event(
         level="INFO",
         message="grade submit accepted",
@@ -503,45 +497,6 @@ def session_submit(session_id: str) -> Any:
         meta={"result_id": result_id},
     )
     return jsonify({"result_id": result_id})
-
-
-@app.get("/sessions/<session_id>/result")
-def session_result(session_id: str) -> Any:
-    session = session_manager.get_session(session_id)
-    if not session:
-        return jsonify({"error": "session not found"}), 404
-
-    return jsonify(
-        {
-            "status": session["status"],
-            "result_id": session.get("result_id"),
-            "result_grade": session.get("result_grade"),
-            "dashboard_url": session.get("dashboard_url"),
-        }
-    )
-
-
-@app.post("/webhook/result/<session_id>")
-def webhook_result(session_id: str) -> Any:
-    existing = session_manager.get_session(session_id)
-    body = request.get_json() or {}
-    session_manager.update_session(
-        session_id,
-        status="graded",
-        result_grade=body.get("grade"),
-        dashboard_url=body.get("dashboard_url"),
-    )
-    _emit_grade_event(
-        level="INFO",
-        message="grade result webhook received",
-        session=existing,
-        session_id=session_id,
-        meta={
-            "grade": body.get("grade"),
-            "dashboard_url": body.get("dashboard_url"),
-        },
-    )
-    return jsonify({"ok": True})
 
 
 # ── Setup / Provisioning ───────────────────────────────────────────────

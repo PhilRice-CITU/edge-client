@@ -52,7 +52,7 @@ curl -X POST http://localhost:5055/sessions \
 # → {"id":"<uuid>","mode":"grade","status":"capturing","batches":[],...}
 ```
 
-> **Note:** The Capture button will fail on a laptop because `rpicam-still` and `pinctrl` are Pi-only. That is expected. Everything else (session flow, status polling, grade results) works fine.
+> **Note:** The Capture button will fail on a laptop because `rpicam-still` and `pinctrl` are Pi-only. That is expected. Everything else (session flow, status polling, upload submit) works fine.
 
 ---
 
@@ -69,7 +69,7 @@ chmod +x setup.sh
 
 # 3. Edit your .env
 nano .env
-# → Set DEVICE_ID, API_BASE_URL, DEVICE_HOST (your Pi's LAN IP)
+# → Set DEVICE_ID and API_BASE_URL
 
 # 4. Edit rice-vision.service if your username or path differs from pi / /home/pi/rice-vision
 nano rice-vision.service
@@ -131,7 +131,6 @@ All variables live in `.env` (copied from `.env.example`). The critical ones:
 | `DEVICE_ID`                   | `pi-001`                   | Identifies this Pi to the API server          |
 | `API_BASE_URL`                | _(required)_               | Cloud API server URL                          |
 | `FLASK_PORT`                  | `5055`                     | Port for the local Flask API                  |
-| `DEVICE_HOST`                 | `192.168.1.100`            | This Pi's LAN IP — used for grade callbacks   |
 | `EDGE_MODE`                   | `production` or `training` | Controls upload destination                   |
 | `DEVICE_SECRET`               | _(empty)_                  | Auth token for API server                     |
 | `MQTT_HOST`                   | _(required)_               | MQTT broker host                              |
@@ -153,7 +152,7 @@ See [`.env.example`](.env.example) for the full list with comments.
                       │ HTTP (fetch)
 ┌─────────────────────▼─────────────────────────────────┐
 │  Flask API  (src/app.py)  — port 5055                 │
-│  Session CRUD, capture trigger, submit, webhooks      │
+│  Session CRUD, capture trigger, submit                │
 │  │                                                    │
 │  ├── src/session_manager.py  (JSON file per session)  │
 │  └── scripts/capture.sh --once  (subprocess)          │
@@ -161,8 +160,8 @@ See [`.env.example`](.env.example) for the full list with comments.
                       │ HTTP POST
 ┌─────────────────────▼─────────────────────────────────┐
 │  Cloud API Server  (api-server/)                      │
-│  Receives batch scans, runs AI grading, sends         │
-│  grade result back to Flask webhook                   │
+│  Receives batch scans, runs AI grading.               │
+│  Operators check results in web dashboard.            │
 └───────────────────────────────────────────────────────┘
 
 Background workers (started by startup.sh):

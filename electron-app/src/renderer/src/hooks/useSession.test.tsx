@@ -19,9 +19,6 @@ const mockSession: Session = {
   rice_variety: 'Sinandomeng',
   status: 'capturing',
   batches: [],
-  result_id: null,
-  result_grade: null,
-  dashboard_url: null,
   created_at: '2025-01-01T00:00:00Z',
 }
 
