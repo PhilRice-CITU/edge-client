@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FLASK_BASE_URL, SESSION_POLL_INTERVAL } from '@renderer/lib/constants'
 import type { Session, SessionMode } from '@renderer/types/session'
 
-export function useSession(sessionId: string | null) {
+export function useSession(sessionId: string | null, pausePolling = false) {
   return useQuery<Session>({
     queryKey: ['session', sessionId],
     queryFn: async () => {
@@ -11,8 +11,8 @@ export function useSession(sessionId: string | null) {
       return response.json() as Promise<Session>
     },
     enabled: sessionId !== null,
-    // Stop polling once the session reaches a terminal state
     refetchInterval: (query) => {
+      if (pausePolling) return false
       const status = query.state.data?.status
       if (status === 'submitted' || status === 'failed') return false
       return SESSION_POLL_INTERVAL

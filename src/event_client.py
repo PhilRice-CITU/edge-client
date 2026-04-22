@@ -7,11 +7,18 @@ from typing import Any
 
 _EVENT_QUEUE_FILE = Path(__file__).resolve().parent.parent / "data" / "event_queue.jsonl"
 
+_MAX_QUEUE_BYTES = 512 * 1024  # 512 KB
+
 
 def emit_event(level: str, message: str, meta: dict[str, Any] | None = None) -> bool:
     """Append events to local queue; mqtt_agent publishes them to broker."""
     try:
         _EVENT_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        if (
+            _EVENT_QUEUE_FILE.exists()
+            and _EVENT_QUEUE_FILE.stat().st_size > _MAX_QUEUE_BYTES
+        ):
+            return False
         payload = {
             "level": str(level or "INFO").upper(),
             "message": message,

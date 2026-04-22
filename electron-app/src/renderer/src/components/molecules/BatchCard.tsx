@@ -24,6 +24,7 @@ function BatchImage({ path, label }: { path: string; label: string }) {
         src={src}
         alt={label}
         className="h-16 w-full object-cover"
+        loading="lazy"
         onError={() => setFailed(true)}
       />
       <span className="absolute bottom-1 left-1 rounded bg-black/50 px-1 py-0.5 text-[10px] text-white">

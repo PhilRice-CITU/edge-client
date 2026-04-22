@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+_lock = threading.RLock()
 
 _ROOT = Path(__file__).resolve().parent.parent
 SESSIONS_DIR = Path(os.getenv("SESSIONS_DIR", str(_ROOT / "data" / "sessions")))
@@ -16,15 +19,17 @@ def _session_path(session_id: str) -> Path:
 
 
 def _load(session_id: str) -> dict[str, Any] | None:
-    path = _session_path(session_id)
-    if not path.exists():
-        return None
-    return json.loads(path.read_text())
+    with _lock:
+        path = _session_path(session_id)
+        if not path.exists():
+            return None
+        return json.loads(path.read_text())
 
 
 def _save(session: dict[str, Any]) -> None:
-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    _session_path(session["id"]).write_text(json.dumps(session, indent=2))
+    with _lock:
+        SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        _session_path(session["id"]).write_text(json.dumps(session, indent=2))
 
 
 def create_session(

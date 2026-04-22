@@ -3,7 +3,6 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { useSession, useUpdateSession, useSubmitSession } from '@renderer/hooks/useSession'
 import { useCapture } from '@renderer/hooks/useCapture'
 import { BatchGallery } from '@renderer/components/organisms/BatchGallery'
-import { CameraPreview } from '@renderer/components/organisms/CameraPreview'
 import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
 import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
@@ -13,8 +12,11 @@ import type { UploadStep } from '@renderer/components/organisms/UploadProgress'
 export function SessionPage() {
   const { sessionId } = useParams({ from: '/session/$sessionId' })
   const navigate = useNavigate()
-  const { data: session, isLoading } = useSession(sessionId)
+
+  // Hooks must be called in stable order.
+  // capture is declared first so its isPending flag can pause session polling.
   const capture = useCapture(sessionId)
+  const { data: session, isLoading } = useSession(sessionId, capture.isPending)
   const updateSession = useUpdateSession(sessionId)
   const submitSession = useSubmitSession(sessionId)
 
@@ -112,10 +114,13 @@ export function SessionPage() {
           </span>
         </div>
 
-        {/* Camera preview — collapses to nothing when camera is absent */}
-        <div className="mt-3">
-          <CameraPreview isCapturing={capture.isPending} className="h-48" />
-        </div>
+        {/* Show a "capturing in progress" notice since there is no live preview */}
+        {capture.isPending && (
+          <div className="mt-3 flex items-center justify-center gap-3 rounded-2xl bg-muted py-5">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground border-t-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Capturing…</span>
+          </div>
+        )}
 
         <div className="mt-3">
           <BatchGallery batches={session?.batches ?? []} />

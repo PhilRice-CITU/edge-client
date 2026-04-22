@@ -203,12 +203,25 @@ def queue_size() -> Any:
     return jsonify({"size": len(items)})
 
 
+_image_count_cache: dict[str, object] = {"count": 0, "expires": 0.0}
+
+
 @app.get("/status")
 def status() -> Any:
-    images_count = len(list(IMAGE_DIR.glob("*.jpg"))) if IMAGE_DIR.exists() else 0
+    now = time.time()
+    if now > float(_image_count_cache["expires"]):
+        _image_count_cache["count"] = (
+            len(list(IMAGE_DIR.glob("*.jpg"))) if IMAGE_DIR.exists() else 0
+        )
+        _image_count_cache["expires"] = now + 30.0
+    images_count = int(_image_count_cache["count"])
+
     queue_count = 0
     if QUEUE_FILE.exists():
-        queue_count = len(json.loads(QUEUE_FILE.read_text()))
+        try:
+            queue_count = len(json.loads(QUEUE_FILE.read_text()))
+        except (json.JSONDecodeError, OSError):
+            queue_count = 0
 
     return jsonify(
         {
@@ -566,4 +579,4 @@ def setup_claim() -> Any:
 
 if __name__ == "__main__":
     port = int(os.getenv("FLASK_PORT", "5055"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
