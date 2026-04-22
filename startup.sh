@@ -26,7 +26,7 @@ trap 'release_lock; shutdown_all' EXIT INT TERM
 log_section "Environment"
 load_env "$SCRIPT_DIR/.env"
 apply_defaults
-require_vars API_BASE_URL
+require_vars API_BASE_URL MQTT_HOST MQTT_PORT
 if [[ -z "${DEVICE_SECRET:-}" ]]; then
     log_warn "DEVICE_SECRET not set"
 fi
@@ -65,7 +65,7 @@ if [[ -n "${DEVICE_ID:-}" ]]; then
 elif [[ -n "${REGION_CODE:-}" ]]; then
     log_fatal "DEVICE_ID missing after headless provisioning — check API_BASE_URL, PROVISION_TOKEN, and REGION_CODE"
 else
-    log_warn "DEVICE_ID not set yet — continuing so setup UI can register this device"
+    log_fatal "DEVICE_ID is required for MQTT-only runtime. Register/provision first, then restart."
 fi
 
 log_section "Flask"
@@ -76,10 +76,10 @@ log_section "Uploader"
 start_python_service "uploader" "$APP_DIR/uploader.py"
 
 log_section "MQTT Agent"
-if [[ "${MQTT_ENABLED:-false}" == "true" ]]; then
-    start_python_service "mqtt-agent" "$APP_DIR/mqtt_agent.py"
-else
-    log_warn "Skipping mqtt-agent because MQTT_ENABLED is false"
+start_python_service "mqtt-agent" "$APP_DIR/mqtt_agent.py"
+sleep 3
+if ! service_alive "mqtt-agent"; then
+    log_fatal "mqtt-agent exited early. Check $LOG_DIR/mqtt-agent.log for broker/auth/tls errors."
 fi
 
 log_section "Capture Button Loop"

@@ -132,6 +132,8 @@ All variables live in `.env` (copied from `.env.example`). The critical ones:
 | `DEVICE_HOST`                 | `192.168.1.100`            | This Pi's LAN IP — used for grade callbacks   |
 | `EDGE_MODE`                   | `production` or `training` | Controls upload destination                   |
 | `DEVICE_SECRET`               | _(empty)_                  | Auth token for API server                     |
+| `MQTT_HOST`                   | _(required)_               | MQTT broker host                              |
+| `MQTT_PORT`                   | `1883`                     | MQTT broker port                              |
 | `MQTT_CAMERA_MAX_FRAME_BYTES` | `250000`                   | Drops oversized preview frames before publish |
 
 See [`.env.example`](.env.example) for the full list with comments.
@@ -163,7 +165,7 @@ See [`.env.example`](.env.example) for the full list with comments.
 
 Background workers (started by startup.sh):
   ├── src/uploader.py      — polls upload_queue.json, routes to API or Roboflow
-  ├── src/heartbeat.py     — sends liveness POST every 15s (default)
+  ├── src/mqtt_agent.py    — MQTT presence, telemetry, logs, commands, camera stream
   └── scripts/capture.sh   — GPIO button polling loop (Pi only)
 ```
 
@@ -194,7 +196,8 @@ edge-client/
 │   ├── enqueue_capture.py #   CLI: append capture pair to upload queue
 │   ├── uploader.py        #   Worker: poll queue → upload_router
 │   ├── upload_router.py   #   Routes uploads to API backend or Roboflow
-│   └── heartbeat.py       #   Worker: POST device status every N seconds
+│   ├── event_client.py    #   App-side event writer to local MQTT log queue
+│   └── mqtt_agent.py      #   MQTT runtime: live telemetry/commands/logs/camera
 │
 ├── electron-app/          # Touchscreen kiosk UI (see TECHNICAL.md)
 │   ├── src/main/          #   Electron main process
@@ -216,14 +219,14 @@ edge-client/
 
 ## Common Issues
 
-| Symptom                                 | Cause                                 | Fix                                               |
-| --------------------------------------- | ------------------------------------- | ------------------------------------------------- |
-| "Grade Rice" shows Flask error          | Flask not running                     | `source .venv/bin/activate && python3 src/app.py` |
-| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop)     | Expected on macOS; camera works on Pi only        |
-| Electron shows blank white screen       | `npm run dev` not started             | Run `npm run dev` inside `electron-app/`          |
-| `startup.sh` exits immediately          | Missing `DEVICE_ID` or `API_BASE_URL` | Edit `.env` with real values                      |
-| Port 5055 already in use                | Another Flask instance running        | `lsof -i :5055` and kill it                       |
-| Tests fail with module not found        | Missing dependencies                  | `pip install flask requests` / `npm install`      |
+| Symptom                                 | Cause                                    | Fix                                               |
+| --------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
+| "Grade Rice" shows Flask error          | Flask not running                        | `source .venv/bin/activate && python3 src/app.py` |
+| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop)        | Expected on macOS; camera works on Pi only        |
+| Electron shows blank white screen       | `npm run dev` not started                | Run `npm run dev` inside `electron-app/`          |
+| `startup.sh` exits immediately          | Missing MQTT/API settings or `DEVICE_ID` | Edit `.env` with valid MQTT broker + API values   |
+| Port 5055 already in use                | Another Flask instance running           | `lsof -i :5055` and kill it                       |
+| Tests fail with module not found        | Missing dependencies                     | `pip install flask requests` / `npm install`      |
 
 ---
 

@@ -17,7 +17,6 @@ import requests
 from commands import execute_command
 
 DEVICE_ID = os.getenv("DEVICE_ID", "").strip()
-MQTT_ENABLED = os.getenv("MQTT_ENABLED", "false").strip().lower() == "true"
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost").strip()
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.getenv("MQTT_USERNAME", "").strip()
@@ -244,7 +243,9 @@ def _publish_camera_frame(client: mqtt.Client, session_id: str) -> None:
 
 def _on_connect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: Any, properties: Any) -> None:
     _ = userdata, flags, properties
-    if getattr(reason_code, "value", reason_code) != 0:
+    rc = int(getattr(reason_code, "value", reason_code))
+    if rc != 0:
+        _append_log_event("ERROR", "mqtt connect failed", {"reason_code": rc})
         return
 
     client.subscribe(_topic("commands/+"), qos=1)
@@ -337,8 +338,9 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
-    if not MQTT_ENABLED or not DEVICE_ID:
-        return
+    if not DEVICE_ID:
+        _append_log_event("ERROR", "missing DEVICE_ID")
+        raise SystemExit(1)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID)
     if MQTT_USERNAME:
@@ -363,7 +365,20 @@ def main() -> None:
     client.on_connect = _on_connect
     client.on_message = _on_message
 
-    client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_SECONDS)
+    try:
+        client.connect(MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE_SECONDS)
+    except Exception as exc:
+        _append_log_event(
+            "ERROR",
+            "mqtt initial connect failed",
+            {
+                "host": MQTT_HOST,
+                "port": MQTT_PORT,
+                "tls_enabled": MQTT_TLS_ENABLED,
+                "detail": str(exc),
+            },
+        )
+        raise SystemExit(1) from exc
     client.loop_start()
     _append_log_event("INFO", "mqtt agent started")
 

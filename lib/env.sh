@@ -35,7 +35,6 @@ apply_defaults() {
 	: "${API_TIMEOUT_SECONDS:=30}"
 	: "${UPLOADER_POLL_SECONDS:=3}"
 	: "${UPLOADER_MAX_RETRIES:=5}"
-	: "${MQTT_ENABLED:=false}"
 	: "${MQTT_HOST:=localhost}"
 	: "${MQTT_PORT:=1883}"
 	: "${MQTT_TLS_ENABLED:=false}"
