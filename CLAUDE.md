@@ -52,7 +52,6 @@ LAYER 3: Electron (electron-app/)          ← touchscreen kiosk UI
 LAYER 2: Python services (src/)            ← "the brain"
   Flask API: session CRUD, capture trigger, grade webhooks
   uploader.py: polls upload_queue.json → routes to API or Roboflow
-  heartbeat.py: POST device liveness every 60s
   Session state: one JSON file per session in data/sessions/
 
 LAYER 1: Bash (startup.sh + lib/)          ← boot orchestration
