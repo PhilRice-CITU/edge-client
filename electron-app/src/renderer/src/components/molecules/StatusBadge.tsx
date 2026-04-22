@@ -29,7 +29,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       )}
     >
       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-      {status.device_id}
+      {status.display_name || status.device_id.slice(0, 8)}
     </span>
   )
 }

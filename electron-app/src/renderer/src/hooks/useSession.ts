@@ -11,7 +11,12 @@ export function useSession(sessionId: string | null) {
       return response.json() as Promise<Session>
     },
     enabled: sessionId !== null,
-    refetchInterval: SESSION_POLL_INTERVAL,
+    // Stop polling once the session reaches a terminal state
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      if (status === 'graded' || status === 'failed') return false
+      return SESSION_POLL_INTERVAL
+    },
     staleTime: 1_000,
   })
 }

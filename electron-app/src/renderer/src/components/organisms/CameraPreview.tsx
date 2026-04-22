@@ -12,15 +12,17 @@ export function CameraPreview({ isCapturing = false, className }: CameraPreviewP
   const [tick, setTick] = useState(0)
   const [available, setAvailable] = useState(true)
 
-  // Poll every 800 ms when camera is working; retry every 5 s when unavailable
   useEffect(() => {
+    // Pause polling while capture is in progress — camera is busy
+    if (isCapturing) return
+
     const delay = available ? 800 : 5_000
     const id = setTimeout(() => {
       setTick((t) => t + 1)
-      if (!available) setAvailable(true) // attempt recovery on each retry
+      if (!available) setAvailable(true)
     }, delay)
     return () => clearTimeout(id)
-  }, [tick, available])
+  }, [tick, available, isCapturing])
 
   if (!available) {
     return (
@@ -46,8 +48,9 @@ export function CameraPreview({ isCapturing = false, className }: CameraPreviewP
         onError={() => setAvailable(false)}
       />
       {isCapturing && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50">
           <div className="h-8 w-8 animate-ping rounded-full bg-white/80" />
+          <p className="text-xs font-medium text-white">Capturing…</p>
         </div>
       )}
     </div>

@@ -3,19 +3,29 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
 import { AnimatedLogo } from '@renderer/components/atoms/AnimatedLogo'
+import { SPLASH_DURATION_MS } from '@renderer/lib/constants'
 
 export function SplashPage() {
   const navigate = useNavigate()
   const { data: status, isError } = useDeviceStatus()
-  const animationsDone = useRef(false)
+  const minTimerDone = useRef(false)
   const statusReady = useRef(false)
   const deviceIdRef = useRef<string>('')
 
   const tryNavigate = useCallback(() => {
-    if (animationsDone.current && statusReady.current) {
+    if (minTimerDone.current && statusReady.current) {
       navigate({ to: deviceIdRef.current ? '/home' : '/setup' })
     }
   }, [navigate])
+
+  // Enforce minimum splash display time
+  useEffect(() => {
+    const id = setTimeout(() => {
+      minTimerDone.current = true
+      tryNavigate()
+    }, SPLASH_DURATION_MS)
+    return () => clearTimeout(id)
+  }, [tryNavigate])
 
   useEffect(() => {
     if ((status || isError) && !statusReady.current) {
@@ -24,11 +34,6 @@ export function SplashPage() {
       tryNavigate()
     }
   }, [status, isError, tryNavigate])
-
-  const handleLastAnimationComplete = () => {
-    animationsDone.current = true
-    tryNavigate()
-  }
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 bg-background">
@@ -48,7 +53,6 @@ export function SplashPage() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.15, duration: 0.4 }}
-            onAnimationComplete={handleLastAnimationComplete}
           >
             PNS/BAFS 290:2025 Grading System
           </motion.p>

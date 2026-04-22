@@ -108,6 +108,20 @@ def status() -> Any:
     )
 
 
+@app.get("/preview/image")
+def preview_image() -> Any:
+    raw_path = request.args.get("path", "").strip()
+    if not raw_path:
+        return jsonify({"error": "path required"}), 400
+    target = Path(raw_path).resolve()
+    allowed = IMAGE_DIR.resolve()
+    if not str(target).startswith(str(allowed)):
+        return jsonify({"error": "forbidden"}), 403
+    if not target.exists() or not target.is_file():
+        return jsonify({"error": "not found"}), 404
+    return Response(target.read_bytes(), mimetype="image/jpeg")
+
+
 @app.get("/preview/frame")
 def preview_frame() -> Any:
     """

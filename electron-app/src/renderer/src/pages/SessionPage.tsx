@@ -8,6 +8,7 @@ import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
 import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
 import { UploadProgress } from '@renderer/components/organisms/UploadProgress'
+import type { UploadStep } from '@renderer/components/organisms/UploadProgress'
 
 export function SessionPage() {
   const { sessionId } = useParams({ from: '/session/$sessionId' })
@@ -16,19 +17,41 @@ export function SessionPage() {
   const capture = useCapture(sessionId)
   const updateSession = useUpdateSession(sessionId)
   const submitSession = useSubmitSession(sessionId)
-  const [submitting, setSubmitting] = useState(false)
-  const [operatorName, setOperatorName] = useState('')
 
-  const handleCapture = () => capture.mutate()
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
+  const [operatorName, setOperatorName] = useState('')
+  const [riceVariety, setRiceVariety] = useState('')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const handleCapture = () => {
+    setSubmitError(null)
+    capture.mutate()
+  }
 
   const handleSubmit = async () => {
     if (submitting || !session?.batches.length) return
     setSubmitting(true)
-    await updateSession.mutateAsync({ operator_name: operatorName })
+    setSubmitError(null)
+    setUploadStep('saving')
+
+    try {
+      await updateSession.mutateAsync({
+        operator_name: operatorName,
+        rice_variety: riceVariety.trim() || null,
+      })
+    } catch {
+      setSubmitError('Failed to save session details. Please try again.')
+      setSubmitting(false)
+      return
+    }
+
+    setUploadStep('uploading')
     try {
       await submitSession.mutateAsync()
       navigate({ to: '/session/$sessionId/result', params: { sessionId } })
     } catch {
+      setSubmitError('Upload failed. Check your connection and try again.')
       setSubmitting(false)
     }
   }
@@ -42,11 +65,13 @@ export function SessionPage() {
   }
 
   if (submitting) {
-    return <UploadProgress batchCount={session?.batches.length ?? 0} />
+    return <UploadProgress batchCount={session?.batches.length ?? 0} step={uploadStep} />
   }
 
+  const batchCount = session?.batches.length ?? 0
+
   return (
-    <div className="flex h-full flex-col gap-4 p-6">
+    <div className="flex h-full flex-col gap-3 p-6">
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate({ to: '/home' })}
@@ -55,25 +80,34 @@ export function SessionPage() {
           ← Back
         </button>
         <span className="text-sm font-medium text-muted-foreground">
-          {session?.batches.length ?? 0} batch
-          {(session?.batches.length ?? 0) !== 1 ? 'es' : ''} captured
+          {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
         </span>
       </div>
 
-      <CameraPreview isCapturing={capture.isPending} className="h-40 flex-shrink-0" />
+      <CameraPreview isCapturing={capture.isPending} className="h-48 shrink-0" />
 
       <BatchGallery batches={session?.batches ?? []} />
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <BatchNameInput
           value={operatorName}
           onChange={setOperatorName}
           placeholder="Operator name (optional)"
         />
+        <BatchNameInput
+          value={riceVariety}
+          onChange={setRiceVariety}
+          placeholder="Rice variety (optional)"
+        />
         <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
+        {submitError && (
+          <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
+            {submitError}
+          </p>
+        )}
         <KioskButton
           onClick={handleSubmit}
-          disabled={!session?.batches.length || submitting}
+          disabled={!batchCount || submitting}
           variant="primary"
         >
           Submit for Grading →
