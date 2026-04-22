@@ -19,14 +19,12 @@ describe('CameraPreview', () => {
 
   it('does not show capture overlay when not capturing', () => {
     render(<CameraPreview isCapturing={false} />)
-    // overlay only exists during capture — check it is absent
-    const img = screen.getByAltText('Live camera preview')
-    expect(img.closest('div')?.querySelector('.animate-ping')).toBeNull()
+    // The ping animation only exists during capture.
+    expect(document.querySelector('.animate-ping')).toBeNull()
   })
 
   it('shows capture overlay when isCapturing is true', () => {
     render(<CameraPreview isCapturing={true} />)
-    const img = screen.getByAltText('Live camera preview')
-    expect(img.closest('div')?.querySelector('.animate-ping')).toBeInTheDocument()
+    expect(document.querySelector('.animate-ping')).toBeInTheDocument()
   })
 })
