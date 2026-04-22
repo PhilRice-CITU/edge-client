@@ -2,6 +2,8 @@
 
 The complete runtime for the Rice Vision grading device. Ships on a Raspberry Pi with a touchscreen, camera module, relay-controlled IR/white LEDs, and a physical capture button.
 
+If you are handing this repo to someone else, start with [EDGE_CLIENT_HANDOFF.md](EDGE_CLIENT_HANDOFF.md).
+
 ---
 
 ## Quick Start (Developer Laptop)
