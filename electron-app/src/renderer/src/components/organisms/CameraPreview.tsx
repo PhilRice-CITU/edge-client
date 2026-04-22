@@ -9,26 +9,31 @@ interface CameraPreviewProps {
 }
 
 const POLL_INTERVAL_OK = 800
-// How long to wait after a failure before retrying (ms)
 const POLL_INTERVAL_FAIL = 5_000
+const MAX_CONSECUTIVE_FAILURES = 3
 
 export function CameraPreview({ isCapturing = false, className }: CameraPreviewProps) {
-
   const [tick, setTick] = useState(0)
   const [available, setAvailable] = useState(true)
+
+  const failCountRef = useRef(0)
+  const [collapsed, setCollapsed] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const prevCapturing = useRef(isCapturing)
   useEffect(() => {
     if (prevCapturing.current && !isCapturing) {
+      failCountRef.current = 0
+      setCollapsed(false)
+      setAvailable(true)
       setTick((t) => t + 1)
     }
     prevCapturing.current = isCapturing
   }, [isCapturing])
 
   useEffect(() => {
-    if (isCapturing) {
+    if (collapsed || isCapturing) {
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null
@@ -40,9 +45,6 @@ export function CameraPreview({ isCapturing = false, className }: CameraPreviewP
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null
-      if (!available) {
-        setAvailable(true)
-      }
       setTick((t) => t + 1)
     }, delay)
 
@@ -52,8 +54,24 @@ export function CameraPreview({ isCapturing = false, className }: CameraPreviewP
         timerRef.current = null
       }
     }
+  }, [tick, available, collapsed, isCapturing])
 
-  }, [tick, available])
+  const handleLoad = () => {
+    failCountRef.current = 0
+    if (!available) setAvailable(true)
+  }
+
+  const handleError = () => {
+    failCountRef.current += 1
+    setAvailable(false)
+    if (failCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
+      setCollapsed(true)
+    }
+  }
+
+  if (collapsed) {
+    return null
+  }
 
   return (
     <div
@@ -63,23 +81,17 @@ export function CameraPreview({ isCapturing = false, className }: CameraPreviewP
         className,
       )}
     >
-      {/* Always render the img so onLoad/onError fire; hide it when unavailable */}
+      {/* Always mount the img so onLoad / onError fire; hide when unavailable */}
       <img
         key={tick}
         src={`${FLASK_BASE_URL}/preview/frame?t=${tick}`}
         alt="Live camera preview"
-        className={cn(
-          'aspect-video w-full object-cover',
-          !available && 'hidden',
-        )}
-        onLoad={() => {
-          // Mark the camera as available on the first successful frame.
-          if (!available) setAvailable(true)
-        }}
-        onError={() => setAvailable(false)}
+        className={cn('aspect-video w-full object-cover', !available && 'hidden')}
+        onLoad={handleLoad}
+        onError={handleError}
       />
 
-      {/* Unavailable overlay — shown instead of the image */}
+      {/* Unavailable overlay — shown instead of the image while retrying */}
       {!available && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <VideoOff className="h-5 w-5 opacity-50" />

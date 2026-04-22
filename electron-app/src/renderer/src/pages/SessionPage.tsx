@@ -97,52 +97,63 @@ export function SessionPage() {
   const batchCount = session?.batches.length ?? 0
 
   return (
-    <div className="flex h-full flex-col gap-3 p-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => navigate({ to: '/home' })}
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          ← Back
-        </button>
-        <span className="text-sm font-medium text-muted-foreground">
-          {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
-        </span>
+    <div className="flex h-full flex-col">
+      {/* ── Scrollable content area ──────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-6 pb-3">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate({ to: '/home' })}
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back
+          </button>
+          <span className="text-sm font-medium text-muted-foreground">
+            {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
+          </span>
+        </div>
+
+        {/* Camera preview — collapses to nothing when camera is absent */}
+        <div className="mt-3">
+          <CameraPreview isCapturing={capture.isPending} className="h-48" />
+        </div>
+
+        <div className="mt-3">
+          <BatchGallery batches={session?.batches ?? []} />
+        </div>
       </div>
 
-      <CameraPreview isCapturing={capture.isPending} className="h-48 shrink-0" />
-
-      <BatchGallery batches={session?.batches ?? []} />
-
-      <div className="flex flex-col gap-2">
-        <BatchNameInput
-          value={operatorName}
-          onChange={setOperatorName}
-          placeholder="Operator name (optional)"
-        />
-        <BatchNameInput
-          value={riceVariety}
-          onChange={setRiceVariety}
-          placeholder="Rice variety (optional)"
-        />
-        <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
-        {captureError && (
-          <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
-            {captureError}
-          </p>
-        )}
-        {submitError && (
-          <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
-            {submitError}
-          </p>
-        )}
-        <KioskButton
-          onClick={handleSubmit}
-          disabled={!batchCount || submitting}
-          variant="primary"
-        >
-          Submit for Grading →
-        </KioskButton>
+      {/* ── Sticky bottom actions — always visible ───────────────── */}
+      <div className="shrink-0 border-t border-border bg-background px-6 py-4">
+        <div className="flex flex-col gap-2">
+          <BatchNameInput
+            value={operatorName}
+            onChange={setOperatorName}
+            placeholder="Operator name (optional)"
+          />
+          <BatchNameInput
+            value={riceVariety}
+            onChange={setRiceVariety}
+            placeholder="Rice variety (optional)"
+          />
+          <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
+          {captureError && (
+            <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
+              {captureError}
+            </p>
+          )}
+          {submitError && (
+            <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
+              {submitError}
+            </p>
+          )}
+          <KioskButton
+            onClick={handleSubmit}
+            disabled={!batchCount || submitting}
+            variant="primary"
+          >
+            Submit for Grading →
+          </KioskButton>
+        </div>
       </div>
     </div>
   )

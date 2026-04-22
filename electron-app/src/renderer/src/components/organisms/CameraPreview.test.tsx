@@ -10,16 +10,26 @@ describe('CameraPreview', () => {
     expect(img.getAttribute('src')).toContain('/preview/frame')
   })
 
-  it('shows unavailable state when image fails to load', () => {
+  it('shows unavailable state when image fails to load (first failure)', () => {
     render(<CameraPreview />)
     const img = screen.getByAltText('Live camera preview')
     fireEvent.error(img)
     expect(screen.getByText('Camera unavailable')).toBeInTheDocument()
   })
 
+  it('collapses entirely after MAX_CONSECUTIVE_FAILURES', () => {
+    const { container } = render(<CameraPreview />)
+    const img = screen.getByAltText('Live camera preview')
+    // Simulate 3 consecutive errors (the collapse threshold)
+    fireEvent.error(img)
+    fireEvent.error(img)
+    fireEvent.error(img)
+    // After 3 failures the component should render nothing
+    expect(container.innerHTML).toBe('')
+  })
+
   it('does not show capture overlay when not capturing', () => {
     render(<CameraPreview isCapturing={false} />)
-    // The ping animation only exists during capture.
     expect(document.querySelector('.animate-ping')).toBeNull()
   })
 
