@@ -12,6 +12,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 IMAGE_DIR="${IMAGE_DIR:-$ROOT_DIR/data/images}"
 QUEUE_FILE="$ROOT_DIR/data/upload_queue.json"
 DEVICE_ID="${DEVICE_ID:-pi-001}"
+CAPTURE_LOCK_FILE="${CAPTURE_LOCK_FILE:-/tmp/edge-capture.lock}"
 
 mkdir -p "$IMAGE_DIR" "$(dirname "$QUEUE_FILE")"
 
@@ -21,11 +22,47 @@ mkdir -p "$IMAGE_DIR" "$(dirname "$QUEUE_FILE")"
 pinctrl set $RELAY op
 pinctrl set $BUTTON ip pu
 
-# ── Core capture function ──────────────────────────────────────────────────────
-# Sets IR_PATH and WHITE_PATH in the calling scope.
-# All diagnostic output goes to stderr so stdout stays clean for --once mode.
 IR_PATH=""
 WHITE_PATH=""
+
+acquire_capture_lock() {
+    mkdir -p "$(dirname "$CAPTURE_LOCK_FILE")"
+
+    if [[ -f "$CAPTURE_LOCK_FILE" ]]; then
+        local existing_pid=""
+        existing_pid="$(cat "$CAPTURE_LOCK_FILE" 2>/dev/null || true)"
+        if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            >&2 echo "ERROR: capture already in progress (pid=$existing_pid)"
+            return 1
+        fi
+        rm -f "$CAPTURE_LOCK_FILE"
+    fi
+
+    if ! (set -o noclobber; echo "$$" > "$CAPTURE_LOCK_FILE") 2>/dev/null; then
+        >&2 echo "ERROR: capture already in progress"
+        return 1
+    fi
+
+    return 0
+}
+
+release_capture_lock() {
+    rm -f "$CAPTURE_LOCK_FILE"
+}
+
+run_capture_with_lock() {
+    if ! acquire_capture_lock; then
+        return 1
+    fi
+
+    if do_capture; then
+        release_capture_lock
+        return 0
+    fi
+
+    release_capture_lock
+    return 1
+}
 
 do_capture() {
     local TS
@@ -57,7 +94,7 @@ do_capture() {
 # ── One-shot mode (triggered by Flask UI-button endpoint) ─────────────────────
 # Outputs {"ir_path":"...","white_path":"..."} to stdout and exits.
 if [[ "${1:-}" == "--once" ]]; then
-    do_capture
+    run_capture_with_lock
     if [[ -f "$IR_PATH" ]] && [[ -f "$WHITE_PATH" ]]; then
         printf '{"ir_path":"%s","white_path":"%s"}\n' "$IR_PATH" "$WHITE_PATH"
         exit 0
@@ -81,7 +118,7 @@ while true; do
         CAPTURED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
         # Wrap in if so set -e does not exit the loop on capture failure
-        if do_capture; then
+        if run_capture_with_lock; then
             # ── Enqueue for upload ──────────────────────────────────────────────
             # Both files must exist before we enqueue.
             # The uploader worker reads this queue and routes to API or Roboflow

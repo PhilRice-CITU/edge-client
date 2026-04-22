@@ -9,7 +9,16 @@ export function useCapture(sessionId: string) {
       const response = await fetch(`${FLASK_BASE_URL}/sessions/${sessionId}/capture`, {
         method: 'POST',
       })
-      if (!response.ok) throw new Error('Capture failed')
+      if (!response.ok) {
+        let detail = 'Capture failed'
+        try {
+          const payload = (await response.json()) as { error?: string; detail?: string }
+          detail = payload.detail ?? payload.error ?? detail
+        } catch {
+          // Keep default message when backend body is not JSON.
+        }
+        throw new Error(detail)
+      }
       return response.json() as Promise<Session>
     },
     onSuccess: (data) => {

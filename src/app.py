@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,8 @@ API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
 DEVICE_HOST = os.getenv("DEVICE_HOST", "127.0.0.1")
 CAPTURE_SCRIPT = _ROOT / "scripts" / "capture.sh"
+CAPTURE_LOCK_FILE = Path(os.getenv("CAPTURE_LOCK_FILE", "/tmp/edge-capture.lock"))
+PREVIEW_FRAME_TIMEOUT_SECONDS = int(os.getenv("PREVIEW_FRAME_TIMEOUT_SECONDS", "6"))
 
 
 def _is_grade_mode(session: dict[str, Any] | None) -> bool:
@@ -62,6 +65,122 @@ def _emit_grade_event(
 
 def _callback_url(session_id: str) -> str:
     return f"http://{DEVICE_HOST}:{FLASK_PORT}/webhook/result/{session_id}"
+
+
+def _capture_lock_pid() -> int | None:
+    if not CAPTURE_LOCK_FILE.exists():
+        return None
+
+    try:
+        raw = CAPTURE_LOCK_FILE.read_text().strip()
+    except OSError:
+        return None
+
+    if not raw:
+        return None
+
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _pid_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def _capture_in_progress() -> bool:
+    if not CAPTURE_LOCK_FILE.exists():
+        return False
+
+    pid = _capture_lock_pid()
+    if pid is not None:
+        if _pid_running(pid):
+            return True
+    else:
+        # A newly created lock may not have a PID yet; treat it as active briefly.
+        try:
+            lock_age_seconds = time.time() - CAPTURE_LOCK_FILE.stat().st_mtime
+        except OSError:
+            return True
+        if lock_age_seconds < 120:
+            return True
+
+    try:
+        CAPTURE_LOCK_FILE.unlink(missing_ok=True)
+    except OSError:
+        return True
+
+    return False
+
+
+def _preview_commands() -> list[list[str]]:
+    width = os.getenv("PREVIEW_FRAME_WIDTH", "640")
+    height = os.getenv("PREVIEW_FRAME_HEIGHT", "480")
+    duration_ms = os.getenv("PREVIEW_FRAME_DURATION_MS", "700")
+
+    return [
+        [
+            "rpicam-still",
+            "-o",
+            "-",
+            "-t",
+            duration_ms,
+            "-n",
+            "--width",
+            width,
+            "--height",
+            height,
+        ],
+        [
+            "libcamera-still",
+            "-o",
+            "-",
+            "-t",
+            duration_ms,
+            "-n",
+            "--width",
+            width,
+            "--height",
+            height,
+        ],
+    ]
+
+
+def _capture_preview_frame() -> tuple[bytes | None, str]:
+    last_error = "camera command unavailable"
+
+    for command in _preview_commands():
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                timeout=PREVIEW_FRAME_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError:
+            continue
+        except subprocess.TimeoutExpired:
+            last_error = f"{command[0]} timed out"
+            continue
+
+        if result.returncode == 0 and result.stdout:
+            return result.stdout, ""
+
+        stderr_text = result.stderr.decode("utf-8", errors="ignore").strip()
+        if stderr_text:
+            last_error = stderr_text[-300:]
+        else:
+            last_error = f"{command[0]} failed with code {result.returncode}"
+
+    return None, last_error
 
 
 @app.get("/health")
@@ -129,25 +248,14 @@ def preview_frame() -> Any:
     Used by the Electron renderer to show a viewfinder in the session screen.
     Returns 503 when rpicam-still is unavailable (e.g. dev environment).
     """
-    try:
-        result = subprocess.run(
-            [
-                "rpicam-still",
-                "-o", "-",         # output JPEG bytes to stdout
-                "-t", "500",       # capture within 500 ms
-                "-n",              # no preview window (headless)
-                "--immediate",
-                "--width", "640",
-                "--height", "480",
-            ],
-            capture_output=True,
-            timeout=5,
-        )
-        if result.returncode != 0 or not result.stdout:
-            return jsonify({"error": "camera unavailable"}), 503
-        return Response(result.stdout, mimetype="image/jpeg")
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return jsonify({"error": "camera unavailable"}), 503
+    if _capture_in_progress():
+        return jsonify({"error": "camera busy", "detail": "capture in progress"}), 503
+
+    frame_bytes, detail = _capture_preview_frame()
+    if frame_bytes is None:
+        return jsonify({"error": "camera unavailable", "detail": detail}), 503
+
+    return Response(frame_bytes, mimetype="image/jpeg")
 
 
 # ── Session management ────────────────────────────────────────────────────────
@@ -216,12 +324,21 @@ def session_capture(session_id: str) -> Any:
         session_id=session_id,
     )
 
+    if _capture_in_progress():
+        _emit_grade_event(
+            level="WARN",
+            message="grade capture skipped because camera is busy",
+            session=session,
+            session_id=session_id,
+        )
+        return jsonify({"error": "capture already in progress"}), 409
+
     try:
         result = subprocess.run(
             ["bash", str(CAPTURE_SCRIPT), "--once"],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=90,
         )
     except subprocess.TimeoutExpired:
         _emit_grade_event(
@@ -229,9 +346,9 @@ def session_capture(session_id: str) -> Any:
             message="grade capture timed out",
             session=session,
             session_id=session_id,
-            meta={"timeout_seconds": 60},
+            meta={"timeout_seconds": 90},
         )
-        return jsonify({"error": "capture timed out after 60s"}), 504
+        return jsonify({"error": "capture timed out after 90s"}), 504
 
     if result.returncode != 0:
         _emit_grade_event(
@@ -242,9 +359,11 @@ def session_capture(session_id: str) -> Any:
             meta={
                 "return_code": result.returncode,
                 "stderr_tail": result.stderr[-500:],
+                "stdout_tail": result.stdout[-500:],
             },
         )
-        return jsonify({"error": "capture script failed", "detail": result.stderr[-500:]}), 500
+        detail = result.stderr[-500:] if result.stderr else result.stdout[-500:]
+        return jsonify({"error": "capture script failed", "detail": detail}), 500
 
     try:
         capture_data = json.loads(result.stdout.strip())

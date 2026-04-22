@@ -22,11 +22,18 @@ export function SessionPage() {
   const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [operatorName, setOperatorName] = useState('')
   const [riceVariety, setRiceVariety] = useState('')
+  const [captureError, setCaptureError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const handleCapture = () => {
+    setCaptureError(null)
     setSubmitError(null)
-    capture.mutate()
+    capture.mutate(undefined, {
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : 'Capture failed. Please try again.'
+        setCaptureError(message)
+      },
+    })
   }
 
   const handleSubmit = async () => {
@@ -100,6 +107,11 @@ export function SessionPage() {
           placeholder="Rice variety (optional)"
         />
         <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
+        {captureError && (
+          <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
+            {captureError}
+          </p>
+        )}
         {submitError && (
           <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
             {submitError}
