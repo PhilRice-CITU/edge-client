@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Hum.ai",
   "main": "./out/main/index.js",
-  "author": "MarsKeiruKylaVal",
+  "author": "philricecitu@gmail.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
     "format": "prettier --write .",
@@ -84,12 +84,16 @@
       {
         "from": "../src",
         "to": "python/src",
-        "filter": ["**/*.py"]
+        "filter": [
+          "**/*.py"
+        ]
       },
       {
         "from": "../scripts",
         "to": "python/scripts",
-        "filter": ["*.sh"]
+        "filter": [
+          "*.sh"
+        ]
       },
       {
         "from": "../requirements.txt",
@@ -97,7 +101,10 @@
       }
     ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Science",
       "icon": "build/icons"
     },
