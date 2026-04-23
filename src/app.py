@@ -20,13 +20,18 @@ app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
 _ROOT = Path(__file__).resolve().parent.parent
-IMAGE_DIR = Path(os.getenv("IMAGE_DIR", str(_ROOT / "data" / "images")))
+_DATA_ROOT = (
+    Path.home() / ".config" / "hum-ai" / "data"
+    if not os.access(_ROOT / "data" if (_ROOT / "data").exists() else _ROOT, os.W_OK)
+    else _ROOT / "data"
+)
+IMAGE_DIR = Path(os.getenv("IMAGE_DIR", str(_DATA_ROOT / "images")))
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3001")
 API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
 CAPTURE_SCRIPT = _ROOT / "scripts" / "capture.sh"
 CAPTURE_LOCK_FILE = Path(os.getenv("CAPTURE_LOCK_FILE", "/tmp/edge-capture.lock"))
-QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_ROOT / "data" / "upload_queue.json")))
+QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_DATA_ROOT / "upload_queue.json")))
 PREVIEW_FRAME_TIMEOUT_SECONDS = int(os.getenv("PREVIEW_FRAME_TIMEOUT_SECONDS", "6"))
 
 

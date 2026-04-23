@@ -11,7 +11,12 @@ from typing import Any
 _lock = threading.RLock()
 
 _ROOT = Path(__file__).resolve().parent.parent
-SESSIONS_DIR = Path(os.getenv("SESSIONS_DIR", str(_ROOT / "data" / "sessions")))
+_DATA_ROOT = (
+    Path.home() / ".config" / "hum-ai" / "data"
+    if not os.access(_ROOT / "data" if (_ROOT / "data").exists() else _ROOT, os.W_OK)
+    else _ROOT / "data"
+)
+SESSIONS_DIR = Path(os.getenv("SESSIONS_DIR", str(_DATA_ROOT / "sessions")))
 
 
 def _session_path(session_id: str) -> Path:
