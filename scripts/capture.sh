@@ -7,7 +7,11 @@ RELAY=17
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-IMAGE_DIR="${IMAGE_DIR:-$ROOT_DIR/data/images}"
+_DEFAULT_IMAGE_DIR="$ROOT_DIR/data/images"
+if [[ ! -w "$ROOT_DIR/data" ]] && [[ ! -w "$ROOT_DIR" ]]; then
+    _DEFAULT_IMAGE_DIR="$HOME/.config/hum-ai/data/images"
+fi
+IMAGE_DIR="${IMAGE_DIR:-$_DEFAULT_IMAGE_DIR}"
 CAPTURE_LOCK_FILE="${CAPTURE_LOCK_FILE:-/tmp/edge-capture.lock}"
 
 mkdir -p "$IMAGE_DIR"
