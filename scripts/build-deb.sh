@@ -6,7 +6,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ELECTRON_APP_DIR="$(cd "$SCRIPT_DIR/../electron-app" && pwd)"
 UNPACKED="$ELECTRON_APP_DIR/dist/linux-arm64-unpacked"
-STAGING="/tmp/hum-ai-deb"
+STAGING="$HOME/hum-ai-deb-staging"
 OUTPUT="$ELECTRON_APP_DIR/dist/hum-ai_1.0.0_arm64.deb"
 
 if [[ ! -d "$UNPACKED" ]]; then
