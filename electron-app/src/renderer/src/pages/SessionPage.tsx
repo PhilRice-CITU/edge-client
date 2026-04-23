@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useSession, useUpdateSession, useSubmitSession } from '@renderer/hooks/useSession'
 import { useCapture } from '@renderer/hooks/useCapture'
+import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { BatchGallery } from '@renderer/components/organisms/BatchGallery'
 import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
 import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
@@ -28,7 +29,8 @@ export function SessionPage() {
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const handleCapture = () => {
+  const handleCapture = useCallback(() => {
+    if (capture.isPending) return
     setCaptureError(null)
     setSubmitError(null)
     capture.mutate(undefined, {
@@ -37,7 +39,10 @@ export function SessionPage() {
         setCaptureError(message)
       },
     })
-  }
+  }, [capture])
+
+  // Physical GPIO button triggers the same capture flow as the on-screen button
+  useGpioButton('session', handleCapture)
 
   const handleSubmit = async () => {
     if (submitting || !session?.batches.length) return

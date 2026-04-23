@@ -16,7 +16,9 @@ const mockStatus: DeviceStatus = {
   device_id: 'pi-001',
   edge_mode: 'production',
   images_on_disk: 5,
-  queued_uploads: 2,
+  queued_uploads: 0,
+  display_name: 'Test Device',
+  qr_url: '',
 }
 
 beforeEach(() => {

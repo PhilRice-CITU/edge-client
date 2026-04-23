@@ -2,25 +2,15 @@
 set -euo pipefail
 
 RELAY=17
-BUTTON=27
 
 # ── Runtime paths ──────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Respect IMAGE_DIR from .env if already exported, otherwise default.
 IMAGE_DIR="${IMAGE_DIR:-$ROOT_DIR/data/images}"
-QUEUE_FILE="$ROOT_DIR/data/upload_queue.json"
-DEVICE_ID="${DEVICE_ID:-pi-001}"
 CAPTURE_LOCK_FILE="${CAPTURE_LOCK_FILE:-/tmp/edge-capture.lock}"
 
-mkdir -p "$IMAGE_DIR" "$(dirname "$QUEUE_FILE")"
-
-# ── GPIO setup ─────────────────────────────────────────────────────────────────
-# op  = output push-pull (controls relay)
-# ip pu = input with pull-up resistor (button reads HIGH at rest, LOW when pressed)
-pinctrl set $RELAY op
-pinctrl set $BUTTON ip pu
+mkdir -p "$IMAGE_DIR"
 
 IR_PATH=""
 WHITE_PATH=""
@@ -91,8 +81,9 @@ do_capture() {
     >&2 echo "Capture complete."
 }
 
-# ── One-shot mode (triggered by Flask UI-button endpoint) ─────────────────────
+# ── One-shot mode (triggered by Flask session capture endpoint) ────────────────
 # Outputs {"ir_path":"...","white_path":"..."} to stdout and exits.
+# Usage: bash capture.sh --once
 if [[ "${1:-}" == "--once" ]]; then
     run_capture_with_lock
     if [[ -f "$IR_PATH" ]] && [[ -f "$WHITE_PATH" ]]; then
@@ -104,50 +95,5 @@ if [[ "${1:-}" == "--once" ]]; then
     fi
 fi
 
-# ── GPIO polling loop ──────────────────────────────────────────────────────────
-echo "System Ready. Waiting for button..."
-
-while true; do
-    state=$(pinctrl get $BUTTON | grep -o "hi\|lo" || true)
-
-    # Button pressed — active LOW means "lo" = pressed
-    if [[ "$state" == "lo" ]]; then
-        echo "Button pressed - Starting capture sequence"
-
-        SESSION_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
-        CAPTURED_AT=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-
-        # Wrap in if so set -e does not exit the loop on capture failure
-        if run_capture_with_lock; then
-            # ── Enqueue for upload ──────────────────────────────────────────────
-            # Both files must exist before we enqueue.
-            # The uploader worker reads this queue and routes to API or Roboflow
-            # depending on EDGE_MODE in .env (production | training).
-            if [[ -f "$IR_PATH" ]] && [[ -f "$WHITE_PATH" ]]; then
-                python3 "$ROOT_DIR/src/enqueue_capture.py" \
-                    --raw    "$WHITE_PATH" \
-                    --ir     "$IR_PATH" \
-                    --session "$SESSION_ID" \
-                    --device  "$DEVICE_ID" \
-                    --captured-at "$CAPTURED_AT" \
-                    --queue "$QUEUE_FILE" \
-                && echo "Queued session $SESSION_ID for upload." \
-                || echo "WARNING: enqueue failed — files saved locally at $IMAGE_DIR"
-            else
-                echo "ERROR: one or both capture files missing — skipping upload queue"
-            fi
-        else
-            echo "ERROR: capture failed for this cycle — will retry on next button press"
-        fi
-
-        # ── Wait for button release (prevents retrigger on hold) ───────────────
-        while [[ "$(pinctrl get $BUTTON | grep -o "hi\|lo" || true)" == "lo" ]]; do
-            sleep 0.1
-        done
-
-        sleep 0.3   # extra debounce delay
-        echo "Ready again..."
-    fi
-
-    sleep 0.1
-done
+echo "Usage: capture.sh --once"
+exit 1

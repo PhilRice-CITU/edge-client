@@ -14,12 +14,12 @@ from flask_cors import CORS
 from event_client import emit_event
 import provision as _provision
 import session_manager
+import upload_router
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
 _ROOT = Path(__file__).resolve().parent.parent
-QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_ROOT / "data" / "upload_queue.json")))
 IMAGE_DIR = Path(os.getenv("IMAGE_DIR", str(_ROOT / "data" / "images")))
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3001")
 API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
@@ -413,8 +413,47 @@ def session_capture(session_id: str) -> Any:
     return jsonify(updated)
 
 
+@app.post("/sessions/<session_id>/upload-training")
+def session_upload_training(session_id: str) -> Any:
+    """Upload the most-recent training batch (ir + white) to Roboflow immediately."""
+    session = session_manager.get_session(session_id)
+    if not session:
+        return jsonify({"error": "session not found"}), 404
+
+    batches = session.get("batches", [])
+    if not batches:
+        return jsonify({"error": "no batches to upload"}), 400
+
+    batch = batches[-1]
+    ir_path = batch.get("ir_path") or batch.get("ir")
+    white_path = batch.get("white_path") or batch.get("raw")
+
+    if not ir_path or not white_path:
+        return jsonify({"error": "batch missing image paths"}), 500
+
+    item = {
+        "session_id": session_id,
+        "ir": ir_path,
+        "raw": white_path,
+        "captured_at": batch.get("captured_at", ""),
+    }
+
+    try:
+        ok = upload_router.upload_to_roboflow(item)
+    except Exception as exc:
+        print(f"[training-upload] roboflow upload failed session_id={session_id} error={exc}", flush=True)
+        return jsonify({"error": "upload failed", "detail": str(exc)}), 500
+
+    if ok:
+        print(f"[training-upload] roboflow upload success session_id={session_id}", flush=True)
+        return jsonify({"uploaded": True, "session_id": session_id, "batch_number": batch.get("batch_number")})
+    else:
+        return jsonify({"error": "roboflow rejected the upload"}), 502
+
+
 @app.post("/sessions/<session_id>/submit")
 def session_submit(session_id: str) -> Any:
+
     session = session_manager.get_session(session_id)
     if not session:
         return jsonify({"error": "session not found"}), 404

@@ -23,7 +23,10 @@ const mockStatus: DeviceStatus = {
   edge_mode: 'production',
   images_on_disk: 0,
   queued_uploads: 0,
+  display_name: 'Test Device',
+  qr_url: '',
 }
+
 
 function makeWrapper() {
   const client = new QueryClient()

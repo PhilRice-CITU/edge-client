@@ -1,17 +1,24 @@
 import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
+import { writeFileSync, readFileSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
-function createWindow(): void {
+import { loadEnv, getConfig, ENV_PATH, PYTHON_ROOT, DATA_ROOT } from './env'
+
+import { spawnSidecar, waitForHealth, shutdownAll } from './sidecar'
+import { startGpioPoller, stopGpioPoller, setGpioMode } from './gpio'
+
+function createWindow(): BrowserWindow {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  const isKiosk = width <= 640
 
   const mainWindow = new BrowserWindow({
-    width: isKiosk ? width : 1024,
-    height: isKiosk ? height : 768,
-    kiosk: isKiosk,
-    frame: !isKiosk,
+    width: Math.max(width, 800),
+    height: Math.max(height, 480),
+    minWidth: 800,
+    minHeight: 480,
+    resizable: true,
+    frame: true,
     show: false,
     autoHideMenuBar: true,
     icon,
@@ -30,63 +37,114 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+app.whenReady().then(async () => {
+  loadEnv()
+  const config = getConfig()
 
-  // Set dock icon on macOS (dev mode — packaged build uses .icns from resources)
+  electronApp.setAppUserModelId('com.ricevision.humai')
+
   if (process.platform === 'darwin' && app.dock) {
     app.dock.setIcon(icon)
   }
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // ── Ensure runtime data directories exist ─────────────────────────────────
+  const { mkdirSync } = await import('fs')
+  mkdirSync(config.IMAGE_DIR, { recursive: true })
+  mkdirSync(config.LOG_DIR, { recursive: true })
 
-  // Open URLs in the system browser (used by ResultCard dashboard link)
+  // ── Start Python sidecars ─────────────────────────────────────────────────
+  console.log('[main] Starting Python sidecars...')
+
+  spawnSidecar('flask', join(PYTHON_ROOT, 'app.py'))
+  try {
+    await waitForHealth(`http://127.0.0.1:${config.FLASK_PORT}/health`)
+  } catch (err) {
+    console.error(`[main] Flask health check failed: ${err}`)
+  }
+
+  spawnSidecar('mqtt-agent', join(PYTHON_ROOT, 'mqtt_agent.py'))
+  console.log('[main] All sidecars started')
+
+  // ── IPC handlers ──────────────────────────────────────────────────────────
   ipcMain.handle('open-external', (_, url: string) => shell.openExternal(url))
 
-  // Renderer queries the Flask base URL so it works with non-default FLASK_PORT
-  ipcMain.handle('get-flask-url', () => {
-    const port = process.env['FLASK_PORT'] ?? '5055'
-    return `http://127.0.0.1:${port}`
+  ipcMain.handle('get-flask-url', () => `http://127.0.0.1:${config.FLASK_PORT}`)
+
+  ipcMain.handle('get-data-root', () => DATA_ROOT)
+
+  // GPIO mode control from renderer pages
+  ipcMain.on('gpio:set-mode', (_, mode: string) => {
+    if (mode === 'training' || mode === 'session' || mode === 'idle') {
+      setGpioMode(mode)
+    }
   })
 
-  createWindow()
+  // Save config fields to the userData .env file
+  ipcMain.handle('save-config', (_, fields: Record<string, string>) => {
+    try {
+      let text = existsSync(ENV_PATH) ? readFileSync(ENV_PATH, 'utf-8') : ''
+      for (const [key, value] of Object.entries(fields)) {
+        const line = `${key}=${value}`
+        const regex = new RegExp(`^${key}\\s*=.*$`, 'm')
+        if (regex.test(text)) {
+          text = text.replace(regex, line)
+        } else {
+          text = text.trimEnd() + `\n${line}\n`
+        }
+      }
+      writeFileSync(ENV_PATH, text, 'utf-8')
+      return { ok: true }
+    } catch (err) {
+      console.error('[main] save-config failed:', err)
+      return { ok: false, error: String(err) }
+    }
+  })
 
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+  // Expose current config snapshot to renderer (for Settings page prefill)
+  ipcMain.handle('get-config', () => {
+    const cfg = getConfig()
+    return {
+      API_BASE_URL: cfg.API_BASE_URL,
+      MQTT_HOST: cfg.MQTT_HOST,
+      MQTT_PORT: String(cfg.MQTT_PORT),
+      EDGE_MODE: cfg.EDGE_MODE,
+      ROBOFLOW_API_KEY: cfg.ROBOFLOW_API_KEY,
+      ROBOFLOW_WORKSPACE: cfg.ROBOFLOW_WORKSPACE,
+      ROBOFLOW_PROJECT_NORMAL: cfg.ROBOFLOW_PROJECT_NORMAL,
+      ROBOFLOW_PROJECT_IR: cfg.ROBOFLOW_PROJECT_IR,
+    }
+  })
+
+  // ── Create window + GPIO ──────────────────────────────────────────────────
+  const mainWindow = createWindow()
+  startGpioPoller(mainWindow)
+
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+app.on('before-quit', () => {
+  console.log('[main] Shutting down...')
+  stopGpioPoller()
+  shutdownAll()
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

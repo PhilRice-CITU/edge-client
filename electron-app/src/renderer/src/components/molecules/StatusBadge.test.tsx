@@ -8,7 +8,10 @@ const mockStatus: DeviceStatus = {
   edge_mode: 'production',
   images_on_disk: 3,
   queued_uploads: 0,
+  display_name: 'Test Device',
+  qr_url: '',
 }
+
 
 describe('StatusBadge', () => {
   it('shows "Offline" when status is undefined', () => {

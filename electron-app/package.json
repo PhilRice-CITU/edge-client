@@ -18,7 +18,9 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build",
+    "build:linux": "electron-vite build && electron-builder --linux",
+    "package:deb": "electron-vite build && electron-builder --linux deb",
+    "package:appimage": "electron-vite build && electron-builder --linux AppImage",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -33,6 +35,7 @@
     "@tanstack/react-router": "^1.168.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "electron-updater": "^6.3.9",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
@@ -70,5 +73,51 @@
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
     "vitest": "^4.1.2"
+  },
+  "build": {
+    "appId": "com.ricevision.humai",
+    "productName": "Hum.ai",
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "../src",
+        "to": "python/src",
+        "filter": ["**/*.py"]
+      },
+      {
+        "from": "../scripts",
+        "to": "python/scripts",
+        "filter": ["*.sh"]
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "python/requirements.txt"
+      }
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Science",
+      "icon": "build/icons"
+    },
+    "deb": {
+      "depends": [
+        "python3",
+        "python3-pip",
+        "libgtk-3-0",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libsecret-1-0"
+      ],
+      "afterInstall": "../scripts/after-install.sh"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns"
+    }
   }
 }

@@ -1,17 +1,65 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { QRCodeSVG } from 'qrcode.react'
-import { Moon, Sun, Cpu, Wifi, ArrowLeft } from 'lucide-react'
+import { Moon, Sun, Cpu, Wifi, ArrowLeft, Save, ChevronDown, ChevronUp } from 'lucide-react'
 import { useTheme } from '@renderer/hooks/useTheme'
 import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
 import { cn } from '@renderer/lib/utils'
+
+interface ConfigFields {
+  API_BASE_URL: string
+  MQTT_HOST: string
+  MQTT_PORT: string
+  EDGE_MODE: string
+  ROBOFLOW_API_KEY: string
+  ROBOFLOW_WORKSPACE: string
+  ROBOFLOW_PROJECT_NORMAL: string
+  ROBOFLOW_PROJECT_IR: string
+}
+
+const DEFAULT_CONFIG: ConfigFields = {
+  API_BASE_URL: '',
+  MQTT_HOST: '',
+  MQTT_PORT: '1883',
+  EDGE_MODE: 'production',
+  ROBOFLOW_API_KEY: '',
+  ROBOFLOW_WORKSPACE: '',
+  ROBOFLOW_PROJECT_NORMAL: '',
+  ROBOFLOW_PROJECT_IR: '',
+}
 
 export function SettingsPage() {
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const { data: status } = useDeviceStatus()
 
+  const [config, setConfig] = useState<ConfigFields>(DEFAULT_CONFIG)
+  const [configExpanded, setConfigExpanded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState<'ok' | 'error' | null>(null)
+
+  // Load current config on mount
+  useEffect(() => {
+    window.api.getConfig().then((cfg) => {
+      setConfig((prev) => ({ ...prev, ...cfg }))
+    })
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaveResult(null)
+    const result = await window.api.saveConfig(config as unknown as Record<string, string>)
+    setSaving(false)
+    setSaveResult(result.ok ? 'ok' : 'error')
+    setTimeout(() => setSaveResult(null), 3000)
+  }
+
+  const handleFieldChange = (key: keyof ConfigFields, value: string) => {
+    setConfig((prev) => ({ ...prev, [key]: value }))
+  }
+
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -24,7 +72,6 @@ export function SettingsPage() {
         <h1 className="text-xl font-semibold text-foreground">Settings</h1>
       </div>
 
-      {/* Settings list */}
       <div className="flex flex-col gap-3">
         {/* Appearance */}
         <section className="flex flex-col gap-2">
@@ -42,7 +89,6 @@ export function SettingsPage() {
                 {theme === 'dark' ? 'Dark mode' : 'Light mode'}
               </span>
             </div>
-            {/* Toggle pill */}
             <div
               className={cn(
                 'relative h-6 w-11 rounded-full transition-colors duration-200',
@@ -71,10 +117,7 @@ export function SettingsPage() {
               label="Name"
               value={status?.display_name || status?.device_id || '—'}
             />
-            <InfoRow
-              label="Device ID"
-              value={status?.device_id ?? '—'}
-            />
+            <InfoRow label="Device ID" value={status?.device_id ?? '—'} />
             <InfoRow
               icon={<Wifi size={16} />}
               label="Mode"
@@ -84,14 +127,7 @@ export function SettingsPage() {
                   : '—'
               }
             />
-            <InfoRow
-              label="Images on disk"
-              value={status ? String(status.images_on_disk) : '—'}
-            />
-            <InfoRow
-              label="Queued uploads"
-              value={status ? String(status.queued_uploads) : '—'}
-            />
+            <InfoRow label="Images on disk" value={status ? String(status.images_on_disk) : '—'} />
           </div>
         </section>
 
@@ -113,13 +149,108 @@ export function SettingsPage() {
           </section>
         )}
 
-        {/* App info */}
+        {/* Configuration */}
+        <section className="flex flex-col gap-2">
+          <button
+            onClick={() => setConfigExpanded((v) => !v)}
+            className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            <span>Configuration</span>
+            {configExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {configExpanded && (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+              <ConfigField
+                label="API Base URL"
+                value={config.API_BASE_URL}
+                placeholder="https://your-api-server.com"
+                onChange={(v) => handleFieldChange('API_BASE_URL', v)}
+              />
+              <ConfigField
+                label="MQTT Host"
+                value={config.MQTT_HOST}
+                placeholder="broker.hivemq.com"
+                onChange={(v) => handleFieldChange('MQTT_HOST', v)}
+              />
+              <ConfigField
+                label="MQTT Port"
+                value={config.MQTT_PORT}
+                placeholder="1883"
+                onChange={(v) => handleFieldChange('MQTT_PORT', v)}
+              />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Edge Mode</label>
+                <select
+                  value={config.EDGE_MODE}
+                  onChange={(e) => handleFieldChange('EDGE_MODE', e.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="production">Production</option>
+                  <option value="training">Training</option>
+                </select>
+              </div>
+              <ConfigField
+                label="Roboflow API Key"
+                value={config.ROBOFLOW_API_KEY}
+                placeholder="rf_xxxxxxxxxxxx"
+                type="password"
+                onChange={(v) => handleFieldChange('ROBOFLOW_API_KEY', v)}
+              />
+              <ConfigField
+                label="Roboflow Workspace"
+                value={config.ROBOFLOW_WORKSPACE}
+                placeholder="my-workspace"
+                onChange={(v) => handleFieldChange('ROBOFLOW_WORKSPACE', v)}
+              />
+              <ConfigField
+                label="Roboflow Normal Project"
+                value={config.ROBOFLOW_PROJECT_NORMAL}
+                placeholder="rice-grading-normal"
+                onChange={(v) => handleFieldChange('ROBOFLOW_PROJECT_NORMAL', v)}
+              />
+              <ConfigField
+                label="Roboflow IR Project"
+                value={config.ROBOFLOW_PROJECT_IR}
+                placeholder="rice-grading-ir"
+                onChange={(v) => handleFieldChange('ROBOFLOW_PROJECT_IR', v)}
+              />
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className={cn(
+                  'mt-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition-colors',
+                  saving
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                )}
+              >
+                <Save size={15} />
+                {saving ? 'Saving…' : 'Save Configuration'}
+              </button>
+
+              {saveResult === 'ok' && (
+                <p className="text-center text-xs text-green-500">
+                  Saved — restart the app for changes to take effect
+                </p>
+              )}
+              {saveResult === 'error' && (
+                <p className="text-center text-xs text-destructive">
+                  Save failed — check app permissions
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* About */}
         <section className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             About
           </h2>
           <div className="flex flex-col gap-px overflow-hidden rounded-xl border border-border bg-card">
-            <InfoRow label="App" value="Rice Vision" />
+            <InfoRow label="App" value="Hum.ai — Rice Vision" />
             <InfoRow label="Standard" value="PNS/BAFS 290:2025" />
           </div>
         </section>
@@ -144,6 +275,33 @@ function InfoRow({
         <span>{label}</span>
       </div>
       <span className="font-medium text-foreground">{value}</span>
+    </div>
+  )
+}
+
+function ConfigField({
+  label,
+  value,
+  placeholder,
+  type = 'text',
+  onChange,
+}: {
+  label: string
+  value: string
+  placeholder?: string
+  type?: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs text-muted-foreground">{label}</label>
+      <input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
     </div>
   )
 }
