@@ -64,6 +64,9 @@ do_capture() {
     IR_PATH="$IMAGE_DIR/${TS}_ir.jpg"
     WHITE_PATH="$IMAGE_DIR/${TS}_white.jpg"
 
+    # ── Configure relay pin as output ───────────────────────────────────────────
+    pinctrl set $RELAY op
+
     # ── IR Capture ──────────────────────────────────────────────────────────────
     >&2 echo "Switching to IR"
     pinctrl set $RELAY dl   # relay closes → IR illumination active
