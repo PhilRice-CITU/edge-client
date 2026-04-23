@@ -111,6 +111,7 @@
       "icon": "build/icons"
     },
     "deb": {
+      "compression": "gz",
       "depends": [
         "python3",
         "python3-pip",

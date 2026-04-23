@@ -584,7 +584,41 @@ nano ~/.config/hum-ai/.env
 
 ### Updating
 
-For dev/repo installs:
+#### Packaged install (Pi has a .deb installed)
+
+Run these steps on the Pi to deploy the latest code:
+
+```bash
+# 1. Pull latest code
+cd ~/edge-client
+git pull
+
+# 2. Update dependencies (only needed if package.json or requirements.txt changed)
+pip3 install -r requirements.txt --break-system-packages
+cd electron-app && npm install
+
+# 3. Rebuild the .deb
+npm run package:deb
+
+# 4. Check the output filename
+ls dist/*.deb
+
+# 5. Reinstall over the existing version
+sudo dpkg -i dist/hum-ai_1.0.0_arm64.deb
+
+# 6. Relaunch the app (or reboot)
+```
+
+`dpkg -i` over an existing install upgrades in-place — your `~/.config/hum-ai/.env` is not touched.
+
+If the build fails with `tar failed (exit code 2)`, install `fakeroot` first:
+```bash
+sudo apt install fakeroot
+```
+Then retry `npm run package:deb`.
+
+#### Dev/repo installs
+
 ```bash
 cd ~/edge-client
 git pull
@@ -592,8 +626,6 @@ pip3 install -r requirements.txt --break-system-packages
 cd electron-app && npm ci
 # Then relaunch or rebuild
 ```
-
-For packaged installs: install the new `.deb` over the old one (`dpkg -i` handles it).
 
 ---
 
