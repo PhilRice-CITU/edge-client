@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Hum.ai",
   "main": "./out/main/index.js",
-  "author": "philricecitu@gmail.com",
+  "author": {
+    "name": "PhilRice-CITU",
+    "email": "philricecitu@gmail.com"
+  },
   "homepage": "https://electron-vite.org",
   "scripts": {
     "format": "prettier --write .",
