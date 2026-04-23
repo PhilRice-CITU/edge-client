@@ -23,6 +23,7 @@
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
     "package:deb": "electron-vite build && electron-builder --linux deb",
+    "package:deb:manual": "electron-vite build && electron-builder --linux dir && bash ../scripts/build-deb.sh",
     "package:appimage": "electron-vite build && electron-builder --linux AppImage",
     "test": "vitest run",
     "test:watch": "vitest",
