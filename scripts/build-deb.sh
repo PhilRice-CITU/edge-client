@@ -98,7 +98,7 @@ find "$STAGING/opt/Hum.ai" -type f -name "*.sh" -exec chmod 755 {} \;
 find "$STAGING/opt/Hum.ai/resources/python" -type f -name "*.py" -exec chmod 644 {} \;
 
 echo "[build-deb] Building .deb with dpkg-deb..."
-dpkg-deb -Zgzip --no-uniform-compression --build --root-owner-group "$STAGING" "$OUTPUT"
+TMPDIR="$HOME" dpkg-deb -Zgzip --no-uniform-compression --build --root-owner-group "$STAGING" "$OUTPUT"
 
 echo "[build-deb] Done: $OUTPUT"
 echo "[build-deb] Install with: sudo dpkg -i $OUTPUT"
