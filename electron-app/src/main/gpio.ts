@@ -50,11 +50,9 @@ function pollTick(): void {
   if (state === null) return
 
   if (state === 'lo' && !buttonHeld) {
-    // Button just pressed
     buttonHeld = true
     emitButtonPressed()
   } else if (state === 'hi' && buttonHeld) {
-    // Button released — re-arm
     buttonHeld = false
   }
 }

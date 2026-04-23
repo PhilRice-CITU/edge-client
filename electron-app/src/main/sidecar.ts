@@ -1,10 +1,3 @@
-/**
- * Python sidecar manager — spawns, monitors, and kills child processes.
- *
- * Each Python service (Flask, uploader, MQTT agent) runs as a child process
- * of Electron. When Electron exits, all children are cleaned up.
- */
-
 import { spawn, ChildProcess } from 'child_process'
 import { createWriteStream, mkdirSync } from 'fs'
 import { resolve } from 'path'
@@ -20,10 +13,6 @@ interface Sidecar {
 
 const sidecars: Sidecar[] = []
 
-/**
- * Spawn a Python script as a managed child process.
- * stdout/stderr are piped to a log file under LOG_DIR.
- */
 export function spawnSidecar(name: string, scriptPath: string): Sidecar {
   const config = getConfig()
   const logDir = app.isPackaged

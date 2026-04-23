@@ -26,6 +26,7 @@ API_TIMEOUT = int(os.getenv("API_TIMEOUT_SECONDS", "30"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
 CAPTURE_SCRIPT = _ROOT / "scripts" / "capture.sh"
 CAPTURE_LOCK_FILE = Path(os.getenv("CAPTURE_LOCK_FILE", "/tmp/edge-capture.lock"))
+QUEUE_FILE = Path(os.getenv("QUEUE_FILE", str(_ROOT / "data" / "upload_queue.json")))
 PREVIEW_FRAME_TIMEOUT_SECONDS = int(os.getenv("PREVIEW_FRAME_TIMEOUT_SECONDS", "6"))
 
 

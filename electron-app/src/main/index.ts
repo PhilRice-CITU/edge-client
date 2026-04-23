@@ -60,12 +60,10 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // ── Ensure runtime data directories exist ─────────────────────────────────
   const { mkdirSync } = await import('fs')
   mkdirSync(config.IMAGE_DIR, { recursive: true })
   mkdirSync(config.LOG_DIR, { recursive: true })
 
-  // ── Start Python sidecars ─────────────────────────────────────────────────
   console.log('[main] Starting Python sidecars...')
 
   spawnSidecar('flask', join(PYTHON_ROOT, 'app.py'))
@@ -78,21 +76,18 @@ app.whenReady().then(async () => {
   spawnSidecar('mqtt-agent', join(PYTHON_ROOT, 'mqtt_agent.py'))
   console.log('[main] All sidecars started')
 
-  // ── IPC handlers ──────────────────────────────────────────────────────────
   ipcMain.handle('open-external', (_, url: string) => shell.openExternal(url))
 
   ipcMain.handle('get-flask-url', () => `http://127.0.0.1:${config.FLASK_PORT}`)
 
   ipcMain.handle('get-data-root', () => DATA_ROOT)
 
-  // GPIO mode control from renderer pages
   ipcMain.on('gpio:set-mode', (_, mode: string) => {
     if (mode === 'training' || mode === 'session' || mode === 'idle') {
       setGpioMode(mode)
     }
   })
 
-  // Save config fields to the userData .env file
   ipcMain.handle('save-config', (_, fields: Record<string, string>) => {
     try {
       let text = existsSync(ENV_PATH) ? readFileSync(ENV_PATH, 'utf-8') : ''
@@ -113,7 +108,6 @@ app.whenReady().then(async () => {
     }
   })
 
-  // Expose current config snapshot to renderer (for Settings page prefill)
   ipcMain.handle('get-config', () => {
     const cfg = getConfig()
     return {
@@ -128,7 +122,6 @@ app.whenReady().then(async () => {
     }
   })
 
-  // ── Create window + GPIO ──────────────────────────────────────────────────
   const mainWindow = createWindow()
   startGpioPoller(mainWindow)
 

@@ -2,9 +2,6 @@ import { app } from 'electron'
 import { resolve, join } from 'path'
 import { config as dotenvConfig } from 'dotenv'
 
-// ── Path resolution: packaged app vs dev ──────────────────────────────────────
-// In dev:      Python scripts are siblings of electron-app/ in the repo
-// In packaged: Python scripts are bundled as extraResources → resources/python/
 export const PYTHON_ROOT = app.isPackaged
   ? join(process.resourcesPath, 'python', 'src')
   : resolve(__dirname, '..', '..', '..', 'src')
@@ -13,13 +10,10 @@ export const SCRIPTS_ROOT = app.isPackaged
   ? join(process.resourcesPath, 'python', 'scripts')
   : resolve(__dirname, '..', '..', '..', 'scripts')
 
-// .env lives in userData when packaged (~/.config/hum-ai/.env) so it persists
-// across app updates; in dev it stays at the repo root.
 export const ENV_PATH = app.isPackaged
   ? join(app.getPath('userData'), '.env')
   : resolve(__dirname, '..', '..', '..', '.env')
 
-// Data directories — writable by the app at runtime
 export const DATA_ROOT = app.isPackaged
   ? join(app.getPath('userData'), 'data')
   : resolve(__dirname, '..', '..', '..', 'data')
