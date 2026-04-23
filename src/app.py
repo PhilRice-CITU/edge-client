@@ -457,6 +457,50 @@ def session_upload_training(session_id: str) -> Any:
         return jsonify({"error": "roboflow rejected the upload"}), 502
 
 
+@app.post("/capture-and-upload")
+def capture_and_upload() -> Any:
+    """Capture IR + white and immediately upload to Roboflow. No session required."""
+    if _capture_in_progress():
+        return jsonify({"error": "capture already in progress"}), 409
+
+    try:
+        result = subprocess.run(
+            ["bash", str(CAPTURE_SCRIPT), "--once"],
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "capture timed out after 90s"}), 504
+
+    if result.returncode != 0:
+        detail = result.stderr[-500:] if result.stderr else result.stdout[-500:]
+        return jsonify({"error": "capture script failed", "detail": detail}), 500
+
+    try:
+        capture_data = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        return jsonify({"error": "invalid capture output", "raw": result.stdout[:200]}), 500
+
+    ir_path = capture_data.get("ir_path")
+    white_path = capture_data.get("white_path")
+    if not ir_path or not white_path:
+        return jsonify({"error": "capture output missing paths"}), 500
+
+    item = {"ir": ir_path, "raw": white_path}
+    try:
+        ok = upload_router.upload_to_roboflow(item)
+    except Exception as exc:
+        print(f"[capture-and-upload] roboflow upload failed error={exc}", flush=True)
+        return jsonify({"error": "upload failed", "detail": str(exc)}), 500
+
+    if not ok:
+        return jsonify({"error": "roboflow rejected the upload"}), 502
+
+    print(f"[capture-and-upload] success ir={ir_path} white={white_path}", flush=True)
+    return jsonify({"ir_path": ir_path, "white_path": white_path, "uploaded": True})
+
+
 @app.post("/sessions/<session_id>/submit")
 def session_submit(session_id: str) -> Any:
 

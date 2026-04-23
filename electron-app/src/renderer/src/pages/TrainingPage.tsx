@@ -1,6 +1,5 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useCreateSession } from '@renderer/hooks/useSession'
 import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
 import { CheckCircle2, Loader2, UploadCloud } from 'lucide-react'
@@ -15,8 +14,6 @@ interface BatchResult {
 
 export function TrainingPage() {
   const navigate = useNavigate()
-  const createSession = useCreateSession()
-  const sessionIdRef = useRef<string | null>(null)
 
   const [phase, setPhase] = useState<CaptureState>('idle')
   const [captureCount, setCaptureCount] = useState(0)
@@ -40,41 +37,15 @@ export function TrainingPage() {
 
     try {
       const base = await getFlaskBase()
-
-      // Lazily create a training session on first button press
-      let sid = sessionIdRef.current
-      if (!sid) {
-        const session = await createSession.mutateAsync({
-          mode: 'train',
-          operator_name: 'training',
-          rice_variety: null,
-        })
-        sid = session.id
-        sessionIdRef.current = sid
-      }
-
-      // Step 1: Capture IR + white images
-      const captureRes = await fetch(`${base}/sessions/${sid}/capture`, { method: 'POST' })
-      if (!captureRes.ok) {
-        const body = (await captureRes.json().catch(() => ({}))) as {
-          error?: string
-          detail?: string
-        }
-        throw new Error(body.detail ?? body.error ?? 'Capture failed')
-      }
       const newCount = captureCount + 1
       setCaptureCount(newCount)
 
-      // Step 2: Immediately upload IR + white to Roboflow
       setPhase('uploading')
-      const uploadRes = await fetch(`${base}/sessions/${sid}/upload-training`, { method: 'POST' })
+      const res = await fetch(`${base}/capture-and-upload`, { method: 'POST' })
 
-      if (!uploadRes.ok) {
-        const body = (await uploadRes.json().catch(() => ({}))) as {
-          error?: string
-          detail?: string
-        }
-        const msg = body.detail ?? body.error ?? 'Roboflow upload failed'
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+        const msg = body.detail ?? body.error ?? 'Capture or upload failed'
         setLastResult({ captureCount: newCount, uploadStatus: 'error', errorMessage: msg })
         setErrorMessage(msg)
         setPhase('error')
@@ -84,8 +55,6 @@ export function TrainingPage() {
       setUploadCount((u) => u + 1)
       setLastResult({ captureCount: newCount, uploadStatus: 'ok' })
       setPhase('done')
-
-      // Reset to idle after a brief 'done' flash
       setTimeout(() => setPhase('idle'), 1500)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Training capture failed'
@@ -93,7 +62,7 @@ export function TrainingPage() {
       setPhase('error')
       setTimeout(() => setPhase('idle'), 3000)
     }
-  }, [phase, captureCount, createSession])
+  }, [phase, captureCount])
 
   useGpioButton('training', handleTrainingCapture)
 
