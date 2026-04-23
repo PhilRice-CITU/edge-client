@@ -1,4 +1,4 @@
-appId: com.humai.edge
+appId: com.ricevision.humai
 productName: Hum.ai
 directories:
   buildResources: build
@@ -30,11 +30,9 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
-    - dir
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+    - deb
+  maintainer: PhilRice-CITU
+  category: Science
 npmRebuild: false
 publish:
   provider: generic
