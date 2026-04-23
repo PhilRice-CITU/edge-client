@@ -96,7 +96,7 @@ export function TrainingPage() {
             {phase === 'uploading' && (
               <>
                 <UploadCloud size={18} className="animate-pulse text-primary" />
-                <span className="text-sm text-primary">Uploading to Roboflow…</span>
+                <span className="text-sm text-primary">Capturing Images...</span>
               </>
             )}
             {phase === 'done' && (

@@ -125,6 +125,10 @@ app.whenReady().then(async () => {
   const mainWindow = createWindow()
   startGpioPoller(mainWindow)
 
+  if (config.EDGE_MODE === 'training') {
+    setGpioMode('training')
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
