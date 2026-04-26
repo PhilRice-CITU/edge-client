@@ -10,7 +10,7 @@
   "homepage": "https://electron-vite.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/valceven/edge-client.git"
+    "url": "https://github.com/PhilRice-CITU/edge-client.git"
   },
   "scripts": {
     "format": "prettier --write .",

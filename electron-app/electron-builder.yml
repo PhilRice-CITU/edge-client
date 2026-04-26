@@ -38,6 +38,6 @@ linux:
 npmRebuild: false
 publish:
   provider: github
-  owner: valceven
+  owner: PhilRice-CITU
   repo: edge-client
   releaseType: release
