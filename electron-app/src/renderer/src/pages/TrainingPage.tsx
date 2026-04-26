@@ -49,6 +49,9 @@ export function TrainingPage() {
       form.append('raw', await whiteResp.blob(), 'raw.jpg')
 
       const deviceId = getDeviceId()
+      if (!deviceId) {
+        throw new Error('Device not provisioned — go to Setup to register this device')
+      }
       const res = await fetch(apiUrl(`/devices/${deviceId}/upload-training`), {
         method: 'POST',
         headers: edgeHeaders(),

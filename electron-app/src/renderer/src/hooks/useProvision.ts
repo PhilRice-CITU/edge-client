@@ -63,7 +63,12 @@ export function useClaimDevice() {
         const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
         throw new Error(err.detail ?? err.error ?? 'Claim failed')
       }
-      return res.json() as Promise<ClaimResult>
+      const data = (await res.json()) as ClaimResult
+      await window.api.saveConfig({
+        DEVICE_ID: data.device_id,
+        DEVICE_DISPLAY_NAME: data.display_name,
+      })
+      return data
     },
   })
 }
