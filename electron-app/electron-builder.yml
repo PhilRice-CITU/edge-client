@@ -39,5 +39,5 @@ npmRebuild: false
 publish:
   provider: github
   owner: valceven
-  repo: YOUR_REPO_NAME
+  repo: edge-client
   releaseType: release
