@@ -1,253 +1,216 @@
-# Rice Vision — Edge Client
+# Hum.ai — Edge Client
 
-The complete runtime for the Rice Vision grading device. Ships on a Raspberry Pi with a touchscreen, camera module, relay-controlled IR/white LEDs, and a physical capture button.
-
-If you are handing this repo to someone else, start with [EDGE_CLIENT_HANDOFF.md](EDGE_CLIENT_HANDOFF.md).
-
----
-
-## Quick Start (Developer Laptop)
-
-You do **not** need a Raspberry Pi to work on most of this code. The Flask API, session manager, upload queue, and the entire Electron UI all run on macOS/Linux.
-
-```bash
-# 1. Clone and enter
-cd edge-client
-
-# 2. Python backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install flask requests
-
-# 3. Create your env file
-cp .env.example .env
-# Edit .env — at minimum set DEVICE_ID and API_BASE_URL
-
-# 4. Start the local Flask API
-python3 src/app.py
-# → runs on http://127.0.0.1:5055
-
-# 5. Electron UI (separate terminal)
-cd electron-app
-npm install
-npm run dev
-# → opens the kiosk UI connecting to Flask on port 5055
-```
-
-### Verify it works
-
-```bash
-# Flask health
-curl http://localhost:5055/health
-# → {"status":"ok"}
-
-# Device status (what the Electron UI polls)
-curl http://localhost:5055/status
-# → {"device_id":"pi-001","edge_mode":"production","images_on_disk":0,"queued_uploads":0}
-
-# Create a session (what "Grade Rice" does)
-curl -X POST http://localhost:5055/sessions \
-  -H 'Content-Type: application/json' \
-  -d '{"mode":"grade","operator_name":"","rice_variety":null}'
-# → {"id":"<uuid>","mode":"grade","status":"capturing","batches":[],...}
-```
-
-> **Note:** The Capture button will fail on a laptop because `rpicam-still` and `pinctrl` are Pi-only. That is expected. Everything else (session flow, status polling, upload submit) works fine.
+Touchscreen kiosk that runs on a Raspberry Pi to grade rice quality. Operator
+captures images with the physical button, the Pi forwards them to the cloud
+api-server, and the cloud returns a grade.
 
 ---
 
-## Quick Start (Raspberry Pi)
+## What this device actually does
 
-```bash
-# 1. Clone the repo
-git clone <your-repo-url> ~/rice-vision
-cd ~/rice-vision/edge-client
-
-# 2. Run the one-time setup script
-chmod +x setup.sh
-./setup.sh
-
-# 3. Edit your .env
-nano .env
-# → Set DEVICE_ID and API_BASE_URL
-
-# 4. Edit rice-vision.service if your username or path differs from pi / /home/pi/rice-vision
-nano rice-vision.service
-
-# 5. Start the service
-sudo systemctl start rice-vision
-
-# 6. Watch logs
-journalctl -u rice-vision -f
+```
+Operator                Pi (this repo)               Cloud
+   │                          │                         │
+   │ tap "Grade Rice"         │  POST /edge/v1/sessions │
+   │─────────────────────────▶│────────────────────────▶│
+   │                          │                         │
+   │ press capture button     │  capture.sh --once      │
+   │─────────────────────────▶│  (rpicam-still ×2)      │
+   │                          │  POST /sessions/{id}/batches
+   │                          │────────────────────────▶│
+   │                          │                         │
+   │ tap "Submit"             │  POST /sessions/{id}/submit
+   │─────────────────────────▶│  (multipart images)     │
+   │                          │────────────────────────▶│  ← AI grades
+   │                          │                         │
+   │ result on screen ◀───────│ ◀───────────────────────│
 ```
 
-The `setup.sh` script installs system packages, creates the Python venv, builds the Electron app, copies `.env.example` → `.env`, and registers the systemd unit.
+There is **no Flask server** on the Pi anymore. The Electron app is a thin
+client that talks directly to `https://hum-ai-api.onrender.com`. The only
+Python process on the Pi is `mqtt_agent.py` for telemetry + a tiny embedded
+preview HTTP server on port 5056.
 
 ---
 
-## Running Tests
-
-### Electron / React (Vitest)
-
-```bash
-cd electron-app
-npm test              # single run — 10 files, 39 tests
-npm run test:watch    # watch mode
-npm run test:coverage # with coverage report
-```
-
-### Python (pytest)
-
-```bash
-source .venv/bin/activate
-pytest tests/ -v      # 2 files, 19 tests
-```
-
-### What the tests cover
-
-| Layer    | File                       | Tests                                          |
-| -------- | -------------------------- | ---------------------------------------------- |
-| Hook     | `useDeviceStatus.test.tsx` | Fetch success, connection error, non-200       |
-| Hook     | `useSession.test.tsx`      | Create, update, submit, disabled-when-null     |
-| Hook     | `useCapture.test.tsx`      | POST + cache update, error state               |
-| Molecule | `CaptureButton.test.tsx`   | Label states, disabled, onClick                |
-| Molecule | `StatusBadge.test.tsx`     | Offline, online with device_id                 |
-| Organism | `BatchGallery.test.tsx`    | Empty state, card rendering                    |
-| Organism | `CameraPreview.test.tsx`   | Image renders, 503 fallback, capture overlay   |
-| Organism | `ResultCard.test.tsx`      | Grade display, batch count, dashboard link     |
-| Page     | `SplashPage.test.tsx`      | Branding, device_id, timer navigation          |
-| Page     | `HomePage.test.tsx`        | Mode buttons, session creation, Flask error    |
-| Python   | `test_session_manager.py`  | CRUD, batch append, unknown-id handling        |
-| Python   | `test_app.py`              | All Flask endpoints, error codes, mock capture |
-
----
-
-## Environment Variables
-
-All variables live in `.env` (copied from `.env.example`). The critical ones:
-
-| Variable                      | Default                    | Purpose                                       |
-| ----------------------------- | -------------------------- | --------------------------------------------- |
-| `DEVICE_ID`                   | `pi-001`                   | Identifies this Pi to the API server          |
-| `API_BASE_URL`                | _(required)_               | Cloud API server URL                          |
-| `FLASK_PORT`                  | `5055`                     | Port for the local Flask API                  |
-| `EDGE_MODE`                   | `production` or `training` | Controls upload destination                   |
-| `DEVICE_SECRET`               | _(empty)_                  | Auth token for API server                     |
-| `MQTT_HOST`                   | _(required)_               | MQTT broker host                              |
-| `MQTT_PORT`                   | `1883`                     | MQTT broker port                              |
-| `MQTT_CAMERA_MAX_FRAME_BYTES` | `250000`                   | Drops oversized preview frames before publish |
-
-See [`.env.example`](.env.example) for the full list with comments.
-
----
-
-## Architecture Overview
-
-```
-┌───────────────────────────────────────────────────────┐
-│  Touchscreen (Electron Kiosk)                         │
-│  React 19 + TanStack Router + TanStack Query          │
-│  Polls Flask API on localhost:5055                     │
-└─────────────────────┬─────────────────────────────────┘
-                      │ HTTP (fetch)
-┌─────────────────────▼─────────────────────────────────┐
-│  Flask API  (src/app.py)  — port 5055                 │
-│  Session CRUD, capture trigger, submit                │
-│  │                                                    │
-│  ├── src/session_manager.py  (JSON file per session)  │
-│  └── scripts/capture.sh --once  (subprocess)          │
-└─────────────────────┬─────────────────────────────────┘
-                      │ HTTP POST
-┌─────────────────────▼─────────────────────────────────┐
-│  Cloud API Server  (api-server/)                      │
-│  Receives batch scans, runs AI grading.               │
-│  Operators check results in web dashboard.            │
-└───────────────────────────────────────────────────────┘
-
-Background workers (started by startup.sh):
-  ├── src/uploader.py      — polls upload_queue.json, routes to API or Roboflow
-  ├── src/mqtt_agent.py    — MQTT presence, telemetry, logs, commands, camera stream
-  └── scripts/capture.sh   — GPIO button polling loop (Pi only)
-```
-
----
-
-## Folder Structure
+## Repo layout
 
 ```
 edge-client/
-├── .env.example           # All environment variables with defaults
-├── startup.sh             # Main orchestration — starts all services
-├── setup.sh               # One-time Pi installer (apt, venv, npm, systemd)
-├── rice-vision.service    # systemd unit file for auto-start on boot
-│
-├── lib/                   # Bash helper modules (sourced by startup.sh)
-│   ├── log.sh             #   Coloured logging: log_info, log_warn, log_error
-│   ├── env.sh             #   .env loading + require_vars + apply_defaults
-│   ├── lock.sh            #   PID lock file — prevents double-start
-│   ├── services.sh        #   start/stop/track background service PIDs
-│   └── display.sh         #   X11/Wayland detection + Electron kiosk launch
-│
+├── electron-app/              ← React 19 + Electron 39 kiosk UI
+│   ├── src/main/              ← Electron main process (IPC, capture, auto-update)
+│   ├── src/preload/           ← contextBridge IPC surface
+│   ├── src/renderer/src/      ← React UI (atomic design)
+│   └── electron-builder.yml   ← .deb packaging + GitHub Releases publish config
+├── src/                       ← Pi-side Python
+│   ├── mqtt_agent.py          ← MQTT telemetry + preview HTTP server (port 5056)
+│   ├── training_uploader.py   ← Roboflow upload helper
+│   ├── commands.py            ← MQTT command handlers
+│   └── event_client.py        ← Event log forwarding
 ├── scripts/
-│   └── capture.sh         # GPIO relay + camera capture (--once for Flask)
-│
-├── src/                   # Python services
-│   ├── app.py             #   Flask API (11 endpoints)
-│   ├── session_manager.py #   JSON-backed session CRUD
-│   ├── enqueue_capture.py #   CLI: append capture pair to upload queue
-│   ├── uploader.py        #   Worker: poll queue → upload_router
-│   ├── upload_router.py   #   Routes uploads to API backend or Roboflow
-│   ├── event_client.py    #   App-side event writer to local MQTT log queue
-│   └── mqtt_agent.py      #   MQTT runtime: live telemetry/commands/logs/camera
-│
-├── electron-app/          # Touchscreen kiosk UI (see TECHNICAL.md)
-│   ├── src/main/          #   Electron main process
-│   ├── src/preload/       #   contextBridge (IPC security layer)
-│   └── src/renderer/src/  #   React app (Atomic Design)
-│
-├── tests/                 # Python tests (pytest)
-│   ├── test_session_manager.py
-│   └── test_app.py
-│
-└── data/                  # Runtime data (gitignored)
-    ├── images/            #   Captured IR + white JPEGs
-    ├── sessions/          #   JSON session files
-    ├── upload_queue.json  #   Pending uploads
-    └── logs/              #   Service log files
+│   ├── capture.sh             ← rpicam-still IR + white LED dual capture
+│   └── after-install.sh       ← .deb postinstall (Python deps, .env, autostart)
+├── .env.example               ← Shipped inside .deb, copied to ~/.config/Hum.ai/.env
+├── requirements.txt           ← paho-mqtt, requests
+└── setup.sh                   ← One-time dev setup (apt + npm install + .env)
 ```
 
 ---
 
-## Common Issues
+## Install on a Raspberry Pi
 
-| Symptom                                 | Cause                                    | Fix                                               |
-| --------------------------------------- | ---------------------------------------- | ------------------------------------------------- |
-| "Grade Rice" shows Flask error          | Flask not running                        | `source .venv/bin/activate && python3 src/app.py` |
-| Capture fails with "camera unavailable" | `rpicam-still` not found (laptop)        | Expected on macOS; camera works on Pi only        |
-| Electron shows blank white screen       | `npm run dev` not started                | Run `npm run dev` inside `electron-app/`          |
-| `startup.sh` exits immediately          | Missing MQTT/API settings or `DEVICE_ID` | Edit `.env` with valid MQTT broker + API values   |
-| Port 5055 already in use                | Another Flask instance running           | `lsof -i :5055` and kill it                       |
-| Tests fail with module not found        | Missing dependencies                     | `pip install flask requests` / `npm install`      |
+Target: Raspberry Pi 4/5 (arm64) running **Raspberry Pi OS Bookworm 64-bit**,
+with the touchscreen attached and the dual cameras enabled in `raspi-config`.
 
----
-
-## Useful Commands
+### Prerequisites (one time per Pi)
 
 ```bash
-# Flask API only
-source .venv/bin/activate && python3 src/app.py
-
-# Electron dev mode (hot reload)
-cd electron-app && npm run dev
-
-# Full stack on Pi
-bash startup.sh
-
-# Full stack via systemd
-sudo systemctl start rice-vision
-journalctl -u rice-vision -f
-
-# Run all tests
-cd electron-app && npm test
-cd .. && .venv/bin/pytest tests/ -v
+sudo apt-get update
+sudo apt-get install -y python3 python3-pip libcamera-apps
+# Verify camera works
+rpicam-still -o /tmp/test.jpg && echo "✔ camera OK"
 ```
+
+### Option A — `.deb` install (production, "Discord-style" updates)
+
+```bash
+# 1. Download the latest release
+wget https://github.com/YOUR_GITHUB_USER/YOUR_REPO_NAME/releases/latest/download/Hum.ai-X.Y.Z-arm64.deb
+
+# 2. Install (postinstall handles everything: python deps, .env seed, autostart)
+sudo dpkg -i Hum.ai-*.deb
+sudo apt-get install -f   # auto-resolves any missing system deps
+
+# 3. Reboot — kiosk launches on login
+sudo reboot
+```
+
+What the postinstall does, in order:
+1. `pip3 install -r requirements.txt` — installs `paho-mqtt`, `requests`
+2. Copies the shipped `env.example` → `~/.config/Hum.ai/.env` (only if no `.env` exists yet — your existing one is preserved on upgrade)
+3. Drops a `~/.config/autostart/hum-ai.desktop` entry so the kiosk launches on login
+4. Future updates: just install the new `.deb`, no reconfiguration
+
+After install, the device handles everything itself — no SSH needed for
+provisioning. See **[First-boot provisioning](#first-boot-provisioning-one-time-per-pi)** below.
+
+### Option B — Dev / from source (laptop or Pi)
+
+```bash
+git clone <this-repo>
+cd edge-client
+./setup.sh                        # apt + npm + .env + Python deps
+cd electron-app && npm run dev    # hot-reload kiosk UI
+```
+
+On a laptop: UI, cloud calls, and the Setup flow all work. The capture button
+does nothing because there's no `rpicam-still` or GPIO. Everything else is
+testable.
+
+### Updating an existing install
+
+```bash
+# Manual upgrade (or just wait — auto-updater pulls within 4 hours)
+sudo dpkg -i Hum.ai-NEW-VERSION-arm64.deb
+sudo systemctl restart hum-ai 2>/dev/null || pkill -f hum-ai  # restart kiosk
+```
+
+Your `.env` is preserved across upgrades.
+
+---
+
+## First-boot provisioning (one time per Pi)
+
+After install, the kiosk launches with an empty `DEVICE_ID` and routes to
+the **Setup** screen:
+
+1. Operator picks a region and enters the `PROVISION_TOKEN` (from the admin).
+2. The app calls `POST /edge/v1/devices/provision` on the api-server.
+3. The cloud returns a `device_id` + `device_secret`.
+4. The app writes both to `~/.config/Hum.ai/.env` via the preload `saveConfig` IPC.
+5. On next boot the splash sees the `DEVICE_ID` and goes straight to Home.
+
+No SSH required.
+
+---
+
+## Updates — how the auto-updater works
+
+Built on `electron-updater` + GitHub Releases. **Discord-style** — Pi checks
+on boot and every 4 hours, downloads the new `.deb` in the background, shows
+a banner on Home, and installs on next quit.
+
+### Publishing a new version
+
+```bash
+cd electron-app
+# 1. Bump version
+npm version patch                 # 1.0.1 → 1.0.2
+# 2. Build + publish to GitHub Releases (needs a GitHub PAT with `repo` scope)
+GH_TOKEN=ghp_xxx npm run build:publish
+```
+
+This produces:
+- `Hum.ai-1.0.2-arm64.deb`
+- `latest-linux-arm64.yml` (electron-updater manifest)
+
+…and uploads both to a GitHub release. Pis on `1.0.1` notice within 4 hours,
+download in the background, show the banner, and install on next quit.
+
+### Required: set the GitHub repo
+
+`electron-app/electron-builder.yml` currently has placeholders:
+```yaml
+publish:
+  provider: github
+  owner: YOUR_GITHUB_USER
+  repo: YOUR_REPO_NAME
+```
+Replace these before your first publish.
+
+---
+
+## Environment variables
+
+The shipped `.env.example` documents every variable. The required ones for a
+working device:
+
+| Variable | Source | Purpose |
+|----------|--------|---------|
+| `API_BASE_URL` | Pre-filled in `.env.example` | Cloud api-server URL |
+| `DEVICE_ID` | Auto-set by SetupPage | UUID identifying this Pi |
+| `DEVICE_SECRET` | Auto-set by SetupPage | Auth header for `/edge/v1/...` |
+| `PROVISION_TOKEN` | Operator types into SetupPage | Shared admin secret |
+| `REGION_CODE` | Operator picks in SetupPage | Region this Pi belongs to |
+| `MQTT_HOST` / `MQTT_PORT` | Pre-filled | Telemetry broker |
+
+Roboflow keys (`ROBOFLOW_*`) are only needed if the Pi uploads training
+images directly. The api-server has its own copies for forwarded uploads —
+the production flow doesn't need them on the Pi.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Splash hangs forever | `~/.config/Hum.ai/.env` missing or `API_BASE_URL` empty | Re-run postinstall: `sudo dpkg-reconfigure Hum.ai` or copy `env.example` manually |
+| "Cannot reach the server" on Home | Pi has no internet, or api-server is down | Check `curl https://hum-ai-api.onrender.com/edge/v1/devices/regions` |
+| Capture button does nothing | Not on Pi hardware, or `capture.sh` permissions | `chmod +x scripts/capture.sh` and check `journalctl -u hum-ai` |
+| Auto-updates never trigger | `publish.owner`/`repo` still placeholder, or no release published | Set them in `electron-builder.yml` and run `npm run build:publish` |
+| MQTT telemetry missing in dashboard | `mqtt_agent.py` not running | `journalctl -u hum-ai-mqtt -f` (or check the sidecar logs in Electron) |
+
+Logs:
+```bash
+journalctl -u hum-ai -f                          # Electron / kiosk
+~/.config/Hum.ai/logs/                           # app logs
+```
+
+---
+
+## See also
+
+- `CLAUDE.md` — guidance for working on this codebase with Claude Code
+- `electron-app/CLAUDE.md` — Electron app conventions
+- Cloud api-server: `../api-server/`
+- Migration history / decisions: `~/.claude/plans/plan-first-i-want-ethereal-shannon.md`

@@ -1,16 +1,15 @@
 import { motion } from 'framer-motion'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
 import { AnimatedLogo } from '@renderer/components/atoms/AnimatedLogo'
 import { SPLASH_DURATION_MS } from '@renderer/lib/constants'
 
 export function SplashPage() {
   const navigate = useNavigate()
-  const { data: status, isError } = useDeviceStatus()
   const minTimerDone = useRef(false)
   const statusReady = useRef(false)
   const deviceIdRef = useRef<string>('')
+  const [displayId, setDisplayId] = useState('')
 
   const tryNavigate = useCallback(() => {
     if (minTimerDone.current && statusReady.current) {
@@ -27,13 +26,15 @@ export function SplashPage() {
     return () => clearTimeout(id)
   }, [tryNavigate])
 
+  // Read device ID from local .env via IPC — no network call needed
   useEffect(() => {
-    if ((status || isError) && !statusReady.current) {
-      deviceIdRef.current = status?.device_id ?? ''
+    window.api.getDeviceId().then((id) => {
+      deviceIdRef.current = id
+      setDisplayId(id)
       statusReady.current = true
       tryNavigate()
-    }
-  }, [status, isError, tryNavigate])
+    })
+  }, [tryNavigate])
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 bg-background">
@@ -58,14 +59,14 @@ export function SplashPage() {
           </motion.p>
         </div>
       </div>
-      {status && (
+      {displayId && (
         <motion.p
           className="text-xs text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.35 }}
         >
-          {status.device_id}
+          {displayId}
         </motion.p>
       )}
     </div>

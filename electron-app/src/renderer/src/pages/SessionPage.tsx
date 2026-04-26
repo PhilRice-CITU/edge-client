@@ -4,6 +4,7 @@ import { useSession, useUpdateSession, useSubmitSession } from '@renderer/hooks/
 import { useCapture } from '@renderer/hooks/useCapture'
 import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { BatchGallery } from '@renderer/components/organisms/BatchGallery'
+import { CameraPreview } from '@renderer/components/molecules/CameraPreview'
 import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
 import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
@@ -14,20 +15,22 @@ export function SessionPage() {
   const { sessionId } = useParams({ from: '/session/$sessionId' })
   const navigate = useNavigate()
 
-  // Hooks must be called in stable order.
-  // capture is declared first so its isPending flag can pause session polling.
-  const capture = useCapture(sessionId)
-  const { data: session, isLoading } = useSession(sessionId, capture.isPending)
-  const updateSession = useUpdateSession(sessionId)
-  const submitSession = useSubmitSession(sessionId)
-
-  const [submitting, setSubmitting] = useState(false)
-  const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [operatorName, setOperatorName] = useState('')
   const [riceVariety, setRiceVariety] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [uploadSent, setUploadSent] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Hooks must be called in stable order.
+  // session data is needed to pass batch count to useCapture and batches to useSubmitSession.
+  const { data: session, isLoading } = useSession(sessionId, false)
+  const batchCount = session?.batches.length ?? 0
+
+  const capture = useCapture(sessionId, batchCount)
+  const updateSession = useUpdateSession(sessionId)
+  const submitSession = useSubmitSession(sessionId, session?.batches ?? [])
 
   const handleCapture = useCallback(() => {
     if (capture.isPending) return
@@ -45,7 +48,7 @@ export function SessionPage() {
   useGpioButton('session', handleCapture)
 
   const handleSubmit = async () => {
-    if (submitting || !session?.batches.length) return
+    if (submitting || !batchCount) return
     setSubmitting(true)
     setSubmitError(null)
     setUploadSent(false)
@@ -64,7 +67,10 @@ export function SessionPage() {
 
     setUploadStep('uploading')
     try {
-      await submitSession.mutateAsync()
+      await submitSession.mutateAsync({
+        operator_name: operatorName,
+        rice_variety: riceVariety.trim() || null,
+      })
       setSubmitting(false)
       setUploadSent(true)
     } catch {
@@ -82,7 +88,7 @@ export function SessionPage() {
   }
 
   if (submitting) {
-    return <UploadProgress batchCount={session?.batches.length ?? 0} step={uploadStep} />
+    return <UploadProgress batchCount={batchCount} step={uploadStep} />
   }
 
   if (uploadSent) {
@@ -101,8 +107,6 @@ export function SessionPage() {
     )
   }
 
-  const batchCount = session?.batches.length ?? 0
-
   return (
     <div className="flex h-full flex-col">
       {/* ── Scrollable content area ──────────────────────────────── */}
@@ -119,13 +123,12 @@ export function SessionPage() {
           </span>
         </div>
 
-        {/* Show a "capturing in progress" notice since there is no live preview */}
-        {capture.isPending && (
-          <div className="mt-3 flex items-center justify-center gap-3 rounded-2xl bg-muted py-5">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground border-t-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Capturing…</span>
-          </div>
-        )}
+        <div className="mt-3">
+          <CameraPreview
+            paused={capture.isPending}
+            overlayLabel={capture.isPending ? 'Capturing…' : null}
+          />
+        </div>
 
         <div className="mt-3">
           <BatchGallery batches={session?.batches ?? []} />

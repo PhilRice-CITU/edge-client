@@ -17,8 +17,15 @@ function tryPinctrl(args: string): string | null {
   try {
     return execSync(`pinctrl ${args}`, { encoding: 'utf-8', timeout: 2000 }).trim()
   } catch (err: unknown) {
-    const error = err as NodeJS.ErrnoException
-    if (error.code === 'ENOENT') {
+    const error = err as NodeJS.ErrnoException & { stderr?: string }
+    const msg = error.message ?? ''
+    // Treat any "command not found" variant as a permanent unavailability
+    if (
+      error.code === 'ENOENT' ||
+      msg.includes('command not found') ||
+      msg.includes('not found') ||
+      msg.includes('No such file')
+    ) {
       pinctrlAvailable = false
       console.warn('[gpio] pinctrl not found — GPIO polling disabled (non-Pi environment)')
       return null

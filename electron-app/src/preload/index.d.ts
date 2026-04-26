@@ -5,7 +5,6 @@ declare global {
     electron: ElectronAPI
     api: {
       openExternal: (url: string) => Promise<void>
-      getFlaskUrl: () => Promise<string>
     }
   }
 }

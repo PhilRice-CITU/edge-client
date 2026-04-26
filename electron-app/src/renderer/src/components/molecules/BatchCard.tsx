@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { FLASK_BASE_URL } from '@renderer/lib/constants'
 import type { Batch } from '@renderer/types/session'
 
 interface BatchCardProps {
@@ -8,7 +7,7 @@ interface BatchCardProps {
 
 function BatchImage({ path, label }: { path: string; label: string }) {
   const [failed, setFailed] = useState(false)
-  const src = `${FLASK_BASE_URL}/preview/image?path=${encodeURIComponent(path)}`
+  const src = `local-image://${path}`
 
   if (failed) {
     return (

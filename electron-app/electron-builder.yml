@@ -30,10 +30,14 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
-    - deb
+    - target: deb
+      arch:
+        - arm64
   maintainer: PhilRice-CITU
   category: Science
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: valceven
+  repo: YOUR_REPO_NAME
+  releaseType: release
