@@ -4,7 +4,7 @@ import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
 import { CameraPreview } from '@renderer/components/molecules/CameraPreview'
 import { CheckCircle2, Loader2, UploadCloud } from 'lucide-react'
-import { apiUrl, edgeHeaders, getDeviceId } from '@renderer/lib/api'
+import { apiUrl, getDeviceId } from '@renderer/lib/api'
 
 type CaptureState = 'idle' | 'capturing' | 'uploading' | 'done' | 'error'
 
@@ -56,7 +56,6 @@ export function TrainingPage() {
         }
         const res = await fetch(apiUrl(`/devices/${deviceId}/upload-training`), {
           method: 'POST',
-          headers: edgeHeaders(),
           body: form,
         })
 
