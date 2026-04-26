@@ -8,6 +8,10 @@
     "email": "philricecitu@gmail.com"
   },
   "homepage": "https://electron-vite.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/valceven/edge-client.git"
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
