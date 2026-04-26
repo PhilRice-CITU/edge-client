@@ -2,6 +2,11 @@ import { app } from 'electron'
 import { resolve, join } from 'path'
 import { config as dotenvConfig } from 'dotenv'
 
+// Must be set before any app.getPath('userData') calls below.
+// On Linux, Electron derives userData from package.json "name" (hum-ai lowercase),
+// which doesn't match the Hum.ai path seeded by after-install.sh.
+app.setPath('userData', join(app.getPath('appData'), 'Hum.ai'))
+
 export const PYTHON_ROOT = app.isPackaged
   ? join(process.resourcesPath, 'python', 'src')
   : resolve(__dirname, '..', '..', '..', 'src')

@@ -10,11 +10,6 @@ import { loadEnv, getConfig, ENV_PATH, PYTHON_ROOT, DATA_ROOT, SCRIPTS_ROOT } fr
 import { spawnSidecar, shutdownAll } from './sidecar'
 import { startGpioPoller, stopGpioPoller, setGpioMode } from './gpio'
 
-// Lock userData to "Hum.ai" regardless of how the OS derives it from package.json name.
-// On Linux, app.getPath('userData') defaults to ~/.config/hum-ai (lowercase) which
-// doesn't match the path seeded by after-install.sh (~/.config/Hum.ai).
-app.setPath('userData', join(app.getPath('appData'), 'Hum.ai'))
-
 // Must be called before app.whenReady() — registers the custom protocol
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local-image', privileges: { secure: true, supportFetchAPI: true } },
