@@ -94,6 +94,8 @@ export function useSubmitSession(sessionId: string, batches: Session['batches'] 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
+      const paths = batches.flatMap((b) => [b.ir_path, b.white_path])
+      window.api.deleteFiles(paths)
     },
   })
 }

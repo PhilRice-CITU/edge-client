@@ -38,42 +38,48 @@ export function TrainingPage() {
 
       setPhase('uploading')
 
-      // Step 2: upload to Roboflow via cloud edge endpoint
-      const form = new FormData()
-      const [irResp, whiteResp] = await Promise.all([
-        fetch(`local-image://${ir_path}`),
-        fetch(`local-image://${white_path}`),
-      ])
-      if (!irResp.ok || !whiteResp.ok) throw new Error('Could not read captured images from disk')
-      form.append('ir', await irResp.blob(), 'ir.jpg')
-      form.append('raw', await whiteResp.blob(), 'raw.jpg')
+      // Step 2: upload to Roboflow via cloud edge endpoint, then delete from disk
+      let uploadOk = false
+      try {
+        const form = new FormData()
+        const [irResp, whiteResp] = await Promise.all([
+          fetch(`local-image://${ir_path}`),
+          fetch(`local-image://${white_path}`),
+        ])
+        if (!irResp.ok || !whiteResp.ok) throw new Error('Could not read captured images from disk')
+        form.append('ir', await irResp.blob(), 'ir.jpg')
+        form.append('raw', await whiteResp.blob(), 'raw.jpg')
 
-      const deviceId = getDeviceId()
-      if (!deviceId) {
-        throw new Error('Device not provisioned — go to Setup to register this device')
+        const deviceId = getDeviceId()
+        if (!deviceId) {
+          throw new Error('Device not provisioned — go to Setup to register this device')
+        }
+        const res = await fetch(apiUrl(`/devices/${deviceId}/upload-training`), {
+          method: 'POST',
+          headers: edgeHeaders(),
+          body: form,
+        })
+
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+          throw new Error(body.detail ?? body.error ?? 'Upload failed')
+        }
+
+        uploadOk = true
+      } finally {
+        // Training images are never needed after the upload attempt — always clean up
+        await window.api.deleteFiles([ir_path, white_path])
       }
-      const res = await fetch(apiUrl(`/devices/${deviceId}/upload-training`), {
-        method: 'POST',
-        headers: edgeHeaders(),
-        body: form,
-      })
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-        const msg = body.detail ?? body.error ?? 'Upload failed'
-        setLastResult({ captureCount: newCount, uploadStatus: 'error', errorMessage: msg })
-        setErrorMessage(msg)
-        setPhase('error')
-        setTimeout(() => setPhase('idle'), 3000)
-        return
+      if (uploadOk) {
+        setUploadCount((u) => u + 1)
+        setLastResult({ captureCount: newCount, uploadStatus: 'ok' })
+        setPhase('done')
+        setTimeout(() => setPhase('idle'), 1500)
       }
-
-      setUploadCount((u) => u + 1)
-      setLastResult({ captureCount: newCount, uploadStatus: 'ok' })
-      setPhase('done')
-      setTimeout(() => setPhase('idle'), 1500)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Training capture failed'
+      setLastResult({ captureCount: newCount, uploadStatus: 'error', errorMessage: msg })
       setErrorMessage(msg)
       setPhase('error')
       setTimeout(() => setPhase('idle'), 3000)

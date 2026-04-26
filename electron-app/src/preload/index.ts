@@ -15,6 +15,8 @@ const api = {
   runCapture: (): Promise<{ ir_path: string; white_path: string }> =>
     ipcRenderer.invoke('capture:run'),
 
+  deleteFiles: (paths: string[]): Promise<void> => ipcRenderer.invoke('delete-files', paths),
+
   saveConfig: (fields: Record<string, string>): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('save-config', fields),
 

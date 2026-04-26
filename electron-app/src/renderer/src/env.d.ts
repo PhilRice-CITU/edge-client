@@ -17,6 +17,7 @@ interface Window {
     getApiBaseUrl: () => Promise<string>
     getLocalStats: () => Promise<{ images_on_disk: number; queued_uploads: number }>
     runCapture: () => Promise<{ ir_path: string; white_path: string }>
+    deleteFiles: (paths: string[]) => Promise<void>
     saveConfig: (fields: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
     getConfig: () => Promise<Record<string, string>>
     onGpioButtonPressed: (cb: () => void) => () => void

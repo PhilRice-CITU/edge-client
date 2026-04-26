@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, screen, protocol, net } from 'electron'
 import { join } from 'path'
-import { writeFileSync, readFileSync, existsSync, readdirSync } from 'fs'
+import { writeFileSync, readFileSync, existsSync, readdirSync, unlinkSync } from 'fs'
 import { spawn } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -153,6 +153,14 @@ app.whenReady().then(async () => {
       })
       child.on('error', reject)
     })
+  })
+
+  ipcMain.handle('delete-files', (_, paths: string[]) => {
+    for (const p of paths) {
+      if (p.startsWith(config.IMAGE_DIR) && existsSync(p)) {
+        try { unlinkSync(p) } catch { /* ignore */ }
+      }
+    }
   })
 
   ipcMain.handle('save-config', (_, fields: Record<string, string>) => {
