@@ -1,6 +1,6 @@
 {
   "name": "hum-ai",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Hum.ai",
   "main": "./out/main/index.js",
   "author": {
@@ -44,7 +44,7 @@
     "@tanstack/react-router": "^1.168.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dotenv": "^17.4.2",
+    "dotenv": "^16.4.7",
     "electron-updater": "^6.3.9",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",

@@ -38,6 +38,15 @@ elif [[ -f "$USER_ENV_FILE" ]]; then
     echo "[after-install] Existing $USER_ENV_FILE preserved."
 fi
 
+# ── Symlink lowercase hum-ai path for dotenv compatibility ───────────────────
+LOWER_ENV_DIR="$REAL_HOME/.config/hum-ai"
+mkdir -p "$LOWER_ENV_DIR"
+if [[ ! -f "$LOWER_ENV_DIR/.env" ]]; then
+    ln -sf "$USER_ENV_FILE" "$LOWER_ENV_DIR/.env"
+    chown -h "$REAL_USER:$REAL_USER" "$LOWER_ENV_DIR/.env"
+    echo "[after-install] Symlinked $LOWER_ENV_DIR/.env → $USER_ENV_FILE"
+fi
+
 # ── Desktop autostart ─────────────────────────────────────────────────────────
 AUTOSTART_DIR="$REAL_HOME/.config/autostart"
 
