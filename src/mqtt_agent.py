@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
 import signal
-import time
 import ssl
-import base64
+import subprocess
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from typing import Any
 
 import paho.mqtt.client as mqtt
@@ -32,11 +34,16 @@ MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID", f"edge-{DEVICE_ID}").strip() or f"e
 MQTT_TELEMETRY_INTERVAL_SECONDS = int(os.getenv("MQTT_TELEMETRY_INTERVAL_SECONDS", "15"))
 MQTT_SCHEMA_VERSION = int(os.getenv("MQTT_SCHEMA_VERSION", "1"))
 MQTT_CAMERA_MAX_FRAME_BYTES = int(os.getenv("MQTT_CAMERA_MAX_FRAME_BYTES", "250000"))
-FLASK_PORT = int(os.getenv("FLASK_PORT", "5055"))
-PREVIEW_LOCAL_FRAME_URL = os.getenv(
-    "PREVIEW_LOCAL_FRAME_URL",
-    f"http://127.0.0.1:{FLASK_PORT}/preview/frame",
-)
+
+# Preview server — embeds a minimal HTTP server so Electron/MQTT can grab camera frames
+# without depending on Flask.
+PREVIEW_PORT = int(os.getenv("PREVIEW_PORT", "5056"))
+PREVIEW_FRAME_TIMEOUT_SECONDS = int(os.getenv("PREVIEW_FRAME_TIMEOUT_SECONDS", "6"))
+PREVIEW_FRAME_WIDTH = os.getenv("PREVIEW_FRAME_WIDTH", "640")
+PREVIEW_FRAME_HEIGHT = os.getenv("PREVIEW_FRAME_HEIGHT", "480")
+PREVIEW_FRAME_DURATION_MS = os.getenv("PREVIEW_FRAME_DURATION_MS", "700")
+CAPTURE_LOCK_FILE = Path(os.getenv("CAPTURE_LOCK_FILE", "/tmp/edge-capture.lock"))
+
 MQTT_LOG_QUEUE_FILE = Path(
     os.getenv(
         "MQTT_LOG_QUEUE_FILE",
@@ -52,6 +59,94 @@ _processed_command_ids: list[str] = []
 _camera_stream_session: dict[str, Any] | None = None
 _last_camera_size_warn_at = 0.0
 
+
+# ── Camera preview helpers ────────────────────────────────────────────────────
+
+def _capture_in_progress() -> bool:
+    if not CAPTURE_LOCK_FILE.exists():
+        return False
+    try:
+        lock_age_seconds = time.time() - CAPTURE_LOCK_FILE.stat().st_mtime
+    except OSError:
+        return True
+    return lock_age_seconds < 120
+
+
+def _preview_commands() -> list[list[str]]:
+    return [
+        [
+            "rpicam-still", "-o", "-", "-t", PREVIEW_FRAME_DURATION_MS, "-n",
+            "--width", PREVIEW_FRAME_WIDTH, "--height", PREVIEW_FRAME_HEIGHT,
+        ],
+        [
+            "libcamera-still", "-o", "-", "-t", PREVIEW_FRAME_DURATION_MS, "-n",
+            "--width", PREVIEW_FRAME_WIDTH, "--height", PREVIEW_FRAME_HEIGHT,
+        ],
+    ]
+
+
+def _capture_preview_frame() -> tuple[bytes | None, str]:
+    last_error = "camera command unavailable"
+
+    for command in _preview_commands():
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                timeout=PREVIEW_FRAME_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError:
+            continue
+        except subprocess.TimeoutExpired:
+            last_error = f"{command[0]} timed out"
+            continue
+
+        if result.returncode == 0 and result.stdout:
+            return result.stdout, ""
+
+        stderr_text = result.stderr.decode("utf-8", errors="ignore").strip()
+        last_error = stderr_text[-300:] if stderr_text else f"{command[0]} failed with code {result.returncode}"
+
+    return None, last_error
+
+
+# ── Embedded preview HTTP server (port 5056) ──────────────────────────────────
+
+class _PreviewHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        if self.path != "/preview/frame":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        if _capture_in_progress():
+            self.send_response(503)
+            self.end_headers()
+            return
+
+        frame_bytes, _ = _capture_preview_frame()
+        if frame_bytes is None:
+            self.send_response(503)
+            self.end_headers()
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(frame_bytes)))
+        self.end_headers()
+        self.wfile.write(frame_bytes)
+
+    def log_message(self, *args: Any) -> None:
+        pass  # suppress access log noise
+
+
+def _start_preview_server() -> None:
+    srv = HTTPServer(("127.0.0.1", PREVIEW_PORT), _PreviewHandler)
+    Thread(target=srv.serve_forever, daemon=True).start()
+    print(f"[preview] HTTP server listening on http://127.0.0.1:{PREVIEW_PORT}/preview/frame", flush=True)
+
+
+# ── MQTT helpers ──────────────────────────────────────────────────────────────
 
 def _handle_shutdown(signum: int, _frame: Any) -> None:
     _ = signum, _frame
@@ -196,8 +291,9 @@ def _publish_ack(client: mqtt.Client, *, command_id: str, status: str, detail: s
 
 
 def _fetch_local_frame() -> bytes | None:
+    url = f"http://127.0.0.1:{PREVIEW_PORT}/preview/frame"
     try:
-        response = requests.get(PREVIEW_LOCAL_FRAME_URL, timeout=5)
+        response = requests.get(url, timeout=5)
     except Exception:
         return None
 
@@ -341,6 +437,8 @@ def main() -> None:
     if not DEVICE_ID:
         _append_log_event("ERROR", "missing DEVICE_ID")
         raise SystemExit(1)
+
+    _start_preview_server()
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID)
     if MQTT_USERNAME:

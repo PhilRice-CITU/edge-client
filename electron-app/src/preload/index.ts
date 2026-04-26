@@ -3,8 +3,17 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
-  getFlaskUrl: (): Promise<string> => ipcRenderer.invoke('get-flask-url'),
   getDataRoot: (): Promise<string> => ipcRenderer.invoke('get-data-root'),
+
+  getDeviceId: (): Promise<string> => ipcRenderer.invoke('get-device-id'),
+  getDeviceSecret: (): Promise<string> => ipcRenderer.invoke('get-device-secret'),
+  getApiBaseUrl: (): Promise<string> => ipcRenderer.invoke('get-api-base-url'),
+
+  getLocalStats: (): Promise<{ images_on_disk: number; queued_uploads: number }> =>
+    ipcRenderer.invoke('get-local-stats'),
+
+  runCapture: (): Promise<{ ir_path: string; white_path: string }> =>
+    ipcRenderer.invoke('capture:run'),
 
   saveConfig: (fields: Record<string, string>): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('save-config', fields),
@@ -21,6 +30,23 @@ const api = {
   setGpioMode: (mode: 'training' | 'session' | 'idle'): void => {
     ipcRenderer.send('gpio:set-mode', mode)
   },
+
+  // Auto-updater events
+  onUpdateAvailable: (cb: (version: string) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, version: string): void => cb(version)
+    ipcRenderer.on('update:available', handler)
+    return () => {
+      ipcRenderer.removeListener('update:available', handler)
+    }
+  },
+  onUpdateDownloaded: (cb: (version: string) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, version: string): void => cb(version)
+    ipcRenderer.on('update:downloaded', handler)
+    return () => {
+      ipcRenderer.removeListener('update:downloaded', handler)
+    }
+  },
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install-now'),
 }
 
 if (process.contextIsolated) {

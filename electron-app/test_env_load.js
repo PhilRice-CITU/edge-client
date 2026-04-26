@@ -1,0 +1,7 @@
+const path = require('path')
+const dotenv = require('dotenv')
+const ENV_PATH = path.resolve(__dirname, '..', '.env')
+console.log('ENV_PATH:', ENV_PATH)
+const result = dotenv.config({ path: ENV_PATH })
+console.log('Result:', result)
+console.log('API_BASE_URL:', process.env.API_BASE_URL)

@@ -25,10 +25,8 @@ export interface EdgeConfig {
   DEVICE_QR_URL: string
 
   API_BASE_URL: string
-  API_UPLOAD_PATH: string
   API_TIMEOUT_SECONDS: number
 
-  FLASK_PORT: number
   IMAGE_DIR: string
   LOG_DIR: string
   CAPTURE_LOCK_FILE: string
@@ -47,10 +45,9 @@ export interface EdgeConfig {
 }
 
 let _config: EdgeConfig | null = null
-let _childEnv: Record<string, string> = {}
 
 export function loadEnv(): void {
-  const result = dotenvConfig({ path: ENV_PATH })
+  const result = dotenvConfig({ path: ENV_PATH, override: true })
 
   if (result.error) {
     console.warn(`[env] Failed to load ${ENV_PATH}: ${result.error.message}`)
@@ -62,14 +59,12 @@ export function loadEnv(): void {
     return env[key]!
   }
 
-  d('FLASK_PORT', '5055')
   d('IMAGE_DIR', join(DATA_ROOT, 'images'))
   d('LOG_DIR', join(DATA_ROOT, 'logs'))
   d('CAPTURE_LOCK_FILE', '/tmp/edge-capture.lock')
   d('EDGE_MODE', 'production')
   d('PRODUCTION_UPLOAD_TARGET', 'api')
   d('TRAINING_UPLOAD_TARGET', 'roboflow')
-  d('API_UPLOAD_PATH', '/scans')
   d('API_TIMEOUT_SECONDS', '30')
   d('MQTT_HOST', 'localhost')
   d('MQTT_PORT', '1883')
@@ -85,10 +80,8 @@ export function loadEnv(): void {
     DEVICE_QR_URL: env['DEVICE_QR_URL'] ?? '',
 
     API_BASE_URL: env['API_BASE_URL'] ?? '',
-    API_UPLOAD_PATH: env['API_UPLOAD_PATH']!,
     API_TIMEOUT_SECONDS: parseInt(env['API_TIMEOUT_SECONDS']!, 10),
 
-    FLASK_PORT: parseInt(env['FLASK_PORT']!, 10),
     IMAGE_DIR: env['IMAGE_DIR']!,
     LOG_DIR: env['LOG_DIR']!,
     CAPTURE_LOCK_FILE: env['CAPTURE_LOCK_FILE']!,
@@ -106,11 +99,9 @@ export function loadEnv(): void {
     MQTT_PORT: parseInt(env['MQTT_PORT']!, 10),
   }
 
-  _childEnv = { ...process.env } as Record<string, string>
-
   console.log(
-    `[env] Loaded .env — DEVICE_ID=${_config.DEVICE_ID || '(empty)'} ` +
-    `EDGE_MODE=${_config.EDGE_MODE} FLASK_PORT=${_config.FLASK_PORT}`
+    `[env] Loaded .env — DEVICE_ID=${_config!.DEVICE_ID || '(empty)'} ` +
+      `EDGE_MODE=${_config!.EDGE_MODE}`,
   )
 }
 
@@ -120,5 +111,5 @@ export function getConfig(): EdgeConfig {
 }
 
 export function getChildEnv(): Record<string, string> {
-  return _childEnv
+  return process.env as Record<string, string>
 }

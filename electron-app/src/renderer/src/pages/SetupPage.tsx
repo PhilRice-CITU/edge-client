@@ -17,18 +17,20 @@ interface RegistrationResult {
 
 export function SetupPage() {
   const navigate = useNavigate()
-  const { data: regions, isLoading, isError } = useRegions()
+  const { data: regions, isLoading, isError, refetch: refetchRegions } = useRegions()
   const registerDevice = useRegisterDevice()
   const claimDevice = useClaimDevice()
 
   const [view, setView] = useState<View>('pick-region')
   const [claimInput, setClaimInput] = useState('')
+  const [provisionToken, setProvisionToken] = useState('')
   const [result, setResult] = useState<RegistrationResult | null>(null)
   const [claimError, setClaimError] = useState('')
 
   const handleRegister = (region_code: string) => {
+    if (!provisionToken.trim()) return
     registerDevice.mutate(
-      { region_code },
+      { region_code, provision_token: provisionToken.trim() },
       {
         onSuccess: (data) => {
           setResult(data)
@@ -141,6 +143,13 @@ export function SetupPage() {
       </div>
 
       <div className="flex flex-col gap-3 overflow-y-auto py-4">
+        <input
+          className="w-full rounded-xl border border-border bg-input px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Provision token (required)"
+          type="password"
+          value={provisionToken}
+          onChange={(e) => setProvisionToken(e.target.value)}
+        />
         {isLoading && (
           <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
             <Loader2 size={20} className="animate-spin" />
@@ -148,18 +157,26 @@ export function SetupPage() {
           </div>
         )}
         {isError && (
-          <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
-            Could not reach server. Check API_BASE_URL in .env and try again.
-          </p>
+          <div className="flex flex-col items-center gap-2">
+            <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
+              Could not reach server. Check API_BASE_URL in .env and try again.
+            </p>
+            <button
+              onClick={() => void refetchRegions()}
+              className="text-sm text-muted-foreground underline underline-offset-2"
+            >
+              Retry
+            </button>
+          </div>
         )}
         {regions?.map((region) => (
           <button
             key={region.id}
             onClick={() => handleRegister(region.code)}
-            disabled={registerDevice.isPending}
+            disabled={registerDevice.isPending || !provisionToken.trim()}
             className={cn(
               'flex w-full items-center justify-between rounded-xl border border-border bg-card px-5 py-4 text-left text-foreground transition-colors hover:bg-accent',
-              registerDevice.isPending && 'cursor-not-allowed opacity-50',
+              (registerDevice.isPending || !provisionToken.trim()) && 'cursor-not-allowed opacity-50',
             )}
           >
             <span className="text-base font-medium">{region.name}</span>

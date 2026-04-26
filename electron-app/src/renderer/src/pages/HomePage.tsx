@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Settings } from 'lucide-react'
 import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
@@ -12,13 +12,28 @@ export function HomePage() {
   const { data: status } = useDeviceStatus()
   const createSession = useCreateSession()
   const [creating, setCreating] = useState(false)
-  const [flaskError, setFlaskError] = useState(false)
+  const [apiError, setApiError] = useState(false)
   const isProduction = import.meta.env.VITE_EDGE_MODE === 'production'
+
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [updateReady, setUpdateReady] = useState(false)
+
+  useEffect(() => {
+    const offAvailable = window.api.onUpdateAvailable((v) => setUpdateVersion(v))
+    const offDownloaded = window.api.onUpdateDownloaded((v) => {
+      setUpdateVersion(v)
+      setUpdateReady(true)
+    })
+    return () => {
+      offAvailable()
+      offDownloaded()
+    }
+  }, [])
 
   const handleGradeMode = async () => {
     if (creating) return
     setCreating(true)
-    setFlaskError(false)
+    setApiError(false)
     try {
       const session = await createSession.mutateAsync({
         mode: 'grade',
@@ -27,7 +42,7 @@ export function HomePage() {
       })
       navigate({ to: '/session/$sessionId', params: { sessionId: session.id } })
     } catch {
-      setFlaskError(true)
+      setApiError(true)
     } finally {
       setCreating(false)
     }
@@ -62,9 +77,24 @@ export function HomePage() {
       </div>
 
       <div className="flex w-full max-w-sm flex-col gap-4">
-        {flaskError && (
+        {updateVersion && (
+          <div className="rounded-xl bg-primary/10 px-4 py-3 text-center text-sm text-primary">
+            {updateReady
+              ? `v${updateVersion} ready — restarts on next quit`
+              : `v${updateVersion} downloading…`}
+            {updateReady && (
+              <button
+                onClick={() => window.api.installUpdate()}
+                className="ml-2 underline underline-offset-2"
+              >
+                Restart now
+              </button>
+            )}
+          </div>
+        )}
+        {apiError && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
-            Cannot reach device service. Make sure Flask is running (startup.sh).
+            Cannot reach the server. Check your connection and API_BASE_URL in settings.
           </p>
         )}
         <KioskButton onClick={handleGradeMode} disabled={creating} variant="primary">
