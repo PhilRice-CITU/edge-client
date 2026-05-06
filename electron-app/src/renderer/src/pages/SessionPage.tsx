@@ -8,6 +8,8 @@ import { CameraPreview } from '@renderer/components/molecules/CameraPreview'
 import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
 import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
+import { RiceVarietySelect } from '@renderer/components/molecules/RiceVarietySelect'
+import type { RiceVariety } from '@renderer/hooks/useVarieties'
 import { UploadProgress } from '@renderer/components/organisms/UploadProgress'
 import type { UploadStep } from '@renderer/components/organisms/UploadProgress'
 
@@ -16,7 +18,7 @@ export function SessionPage() {
   const navigate = useNavigate()
 
   const [operatorName, setOperatorName] = useState('')
-  const [riceVariety, setRiceVariety] = useState('')
+  const [riceVariety, setRiceVariety] = useState<RiceVariety | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [uploadSent, setUploadSent] = useState(false)
@@ -57,7 +59,7 @@ export function SessionPage() {
     try {
       await updateSession.mutateAsync({
         operator_name: operatorName,
-        rice_variety: riceVariety.trim() || null,
+        rice_variety: riceVariety?.name ?? null,
       })
     } catch {
       setSubmitError('Failed to save session details. Please try again.')
@@ -69,7 +71,7 @@ export function SessionPage() {
     try {
       await submitSession.mutateAsync({
         operator_name: operatorName,
-        rice_variety: riceVariety.trim() || null,
+        rice_variety: riceVariety?.name ?? null,
       })
       setSubmitting(false)
       setUploadSent(true)
@@ -143,11 +145,7 @@ export function SessionPage() {
             onChange={setOperatorName}
             placeholder="Operator name (optional)"
           />
-          <BatchNameInput
-            value={riceVariety}
-            onChange={setRiceVariety}
-            placeholder="Rice variety (optional)"
-          />
+          <RiceVarietySelect value={riceVariety} onChange={setRiceVariety} />
           <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
           {captureError && (
             <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
