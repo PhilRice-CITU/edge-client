@@ -30,6 +30,7 @@ export function useCreateSession() {
     mutationFn: async (params: {
       mode: SessionMode
       operator_name: string
+      session_name: string | null
       rice_variety: string | null
     }) => {
       const response = await fetch(apiUrl('/sessions'), {
@@ -69,10 +70,8 @@ export function useUpdateSession(sessionId: string) {
 export function useSubmitSession(sessionId: string, batches: Session['batches'] = []) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (fields: { operator_name: string; rice_variety: string | null }) => {
+    mutationFn: async () => {
       const form = new FormData()
-      form.append('operator_name', fields.operator_name ?? '')
-      form.append('rice_variety', fields.rice_variety ?? '')
 
       for (const batch of batches) {
         const [irResp, whiteResp] = await Promise.all([

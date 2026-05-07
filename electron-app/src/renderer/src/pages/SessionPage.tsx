@@ -1,15 +1,12 @@
 import { useState, useCallback } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useSession, useUpdateSession, useSubmitSession } from '@renderer/hooks/useSession'
+import { useSession, useSubmitSession } from '@renderer/hooks/useSession'
 import { useCapture } from '@renderer/hooks/useCapture'
 import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { BatchGallery } from '@renderer/components/organisms/BatchGallery'
 import { CameraPreview } from '@renderer/components/molecules/CameraPreview'
 import { CaptureButton } from '@renderer/components/molecules/CaptureButton'
-import { BatchNameInput } from '@renderer/components/molecules/BatchNameInput'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
-import { RiceVarietySelect } from '@renderer/components/molecules/RiceVarietySelect'
-import type { RiceVariety } from '@renderer/hooks/useVarieties'
 import { UploadProgress } from '@renderer/components/organisms/UploadProgress'
 import type { UploadStep } from '@renderer/components/organisms/UploadProgress'
 
@@ -17,21 +14,16 @@ export function SessionPage() {
   const { sessionId } = useParams({ from: '/session/$sessionId' })
   const navigate = useNavigate()
 
-  const [operatorName, setOperatorName] = useState('')
-  const [riceVariety, setRiceVariety] = useState<RiceVariety | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [uploadStep, setUploadStep] = useState<UploadStep>('saving')
   const [uploadSent, setUploadSent] = useState(false)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Hooks must be called in stable order.
-  // session data is needed to pass batch count to useCapture and batches to useSubmitSession.
   const { data: session, isLoading } = useSession(sessionId, false)
   const batchCount = session?.batches.length ?? 0
 
   const capture = useCapture(sessionId, batchCount)
-  const updateSession = useUpdateSession(sessionId)
   const submitSession = useSubmitSession(sessionId, session?.batches ?? [])
 
   const handleCapture = useCallback(() => {
@@ -46,7 +38,6 @@ export function SessionPage() {
     })
   }, [capture])
 
-  // Physical GPIO button triggers the same capture flow as the on-screen button
   useGpioButton('session', handleCapture)
 
   const handleSubmit = async () => {
@@ -56,23 +47,9 @@ export function SessionPage() {
     setUploadSent(false)
     setUploadStep('saving')
 
-    try {
-      await updateSession.mutateAsync({
-        operator_name: operatorName,
-        rice_variety: riceVariety?.name ?? null,
-      })
-    } catch {
-      setSubmitError('Failed to save session details. Please try again.')
-      setSubmitting(false)
-      return
-    }
-
     setUploadStep('uploading')
     try {
-      await submitSession.mutateAsync({
-        operator_name: operatorName,
-        rice_variety: riceVariety?.name ?? null,
-      })
+      await submitSession.mutateAsync()
       setSubmitting(false)
       setUploadSent(true)
     } catch {
@@ -111,7 +88,7 @@ export function SessionPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── Scrollable content area ──────────────────────────────── */}
+      {/* ── Scrollable content ───────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6 pb-3">
         <div className="flex items-center justify-between">
           <button
@@ -120,9 +97,14 @@ export function SessionPage() {
           >
             ← Back
           </button>
-          <span className="text-sm font-medium text-muted-foreground">
-            {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
-          </span>
+          <div className="flex flex-col items-end">
+            {session?.session_name && (
+              <span className="text-sm font-medium text-foreground">{session.session_name}</span>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
+            </span>
+          </div>
         </div>
 
         <div className="mt-3">
@@ -137,15 +119,9 @@ export function SessionPage() {
         </div>
       </div>
 
-      {/* ── Sticky bottom actions — always visible ───────────────── */}
+      {/* ── Sticky bottom actions ────────────────────────────────── */}
       <div className="shrink-0 border-t border-border bg-background px-6 py-4">
         <div className="flex flex-col gap-2">
-          <BatchNameInput
-            value={operatorName}
-            onChange={setOperatorName}
-            placeholder="Operator name (optional)"
-          />
-          <RiceVarietySelect value={riceVariety} onChange={setRiceVariety} />
           <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
           {captureError && (
             <p className="rounded-xl bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">

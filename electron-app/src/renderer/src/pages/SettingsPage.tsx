@@ -122,7 +122,7 @@ export function SettingsPage() {
               icon={<Wifi size={16} />}
               label="Mode"
               value={
-                status
+                status?.edge_mode
                   ? status.edge_mode.charAt(0).toUpperCase() + status.edge_mode.slice(1)
                   : '—'
               }

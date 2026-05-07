@@ -13,6 +13,7 @@ export interface Session {
   id: string
   mode: SessionMode
   operator_name: string
+  session_name: string | null
   rice_variety: string | null
   batches: Batch[]
   status: SessionStatus
