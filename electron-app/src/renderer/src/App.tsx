@@ -1,5 +1,5 @@
 import { Outlet } from '@tanstack/react-router'
-import { UpdateBanner } from '@/components/atoms/UpdateBanner'
+import { UpdateBanner } from '@renderer/components/atoms/UpdateBanner'
 
 export function App() {
   return (
