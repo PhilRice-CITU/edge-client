@@ -59,9 +59,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
+    <div className="flex h-full flex-col items-center gap-6 overflow-y-auto p-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex w-full p-12 items-center gap-3">
         <button
           onClick={() => navigate({ to: '/home' })}
           className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -72,10 +72,10 @@ export function SettingsPage() {
         <h1 className="text-xl font-semibold text-foreground">Settings</h1>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex w-full px-24 flex-col gap-5">
         {/* Appearance */}
         <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="pb-1 border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Appearance
           </h2>
 
@@ -107,7 +107,7 @@ export function SettingsPage() {
 
         {/* Device info */}
         <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="pb-1 border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Device
           </h2>
 
@@ -134,7 +134,7 @@ export function SettingsPage() {
         {/* Device Identity / QR Code */}
         {status?.qr_url && (
           <section className="flex flex-col gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="pb-1 border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Device Identity
             </h2>
             <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-4">
@@ -246,7 +246,7 @@ export function SettingsPage() {
 
         {/* About */}
         <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="pb-1 border-b border-border/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             About
           </h2>
           <div className="flex flex-col gap-px overflow-hidden rounded-xl border border-border bg-card">

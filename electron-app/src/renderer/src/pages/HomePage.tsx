@@ -156,9 +156,9 @@ export function HomePage() {
       }
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-between p-8 overflow-hidden">
+    <div className="relative flex h-full flex-col items-center gap-10 p-6 overflow-hidden">
       {/* ── Normal home content ─────────────────────────────────── */}
-      <div className="flex w-full items-center justify-between">
+      <div className="flex w-full p-12 items-center justify-between">
         <div className="flex items-center gap-2">
           <AnimatedLogo size={28} animate={false} />
           <h1 className="text-xl font-semibold text-foreground">Hum.ai</h1>
@@ -175,12 +175,12 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-4 text-center">
-        <h2 className="text-4xl font-bold text-foreground">Select Mode</h2>
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center w-full max-w-110">
+        <h2 className="text-3xl font-bold text-foreground">Select Mode</h2>
         <p className="text-muted-foreground">Choose how to use this device</p>
       </div>
 
-      <div className="flex w-full max-w-sm flex-col gap-4">
+      <div className="flex w-full max-w-110 flex-col gap-4">
         {updateVersion && (
           <div className="rounded-xl bg-primary/10 px-4 py-3 text-center text-sm text-primary">
             {updateReady
@@ -250,26 +250,28 @@ export function HomePage() {
         </div>
 
         {/* Step content */}
-        <div className="flex flex-1 flex-col justify-center px-6 pb-8" style={slideStyle}>
-          {wizard === 'step1' ? (
-            <Step1
-              operatorName={operatorName}
-              setOperatorName={setOperatorName}
-              inputRef={operatorRef}
-              onNext={goToStep2}
-            />
-          ) : (
-            <Step2
-              sessionName={sessionName}
-              setSessionName={setSessionName}
-              riceVariety={riceVariety}
-              setRiceVariety={setRiceVariety}
-              inputRef={sessionNameRef}
-              apiError={apiError}
-              creating={creating}
-              onStart={handleStart}
-            />
-          )}
+        <div className="flex flex-1 flex-col items-center justify-center pb-6" style={slideStyle}>
+          <div className="w-full max-w-110 px-8">
+            {wizard === 'step1' ? (
+              <Step1
+                operatorName={operatorName}
+                setOperatorName={setOperatorName}
+                inputRef={operatorRef}
+                onNext={goToStep2}
+              />
+            ) : (
+              <Step2
+                sessionName={sessionName}
+                setSessionName={setSessionName}
+                riceVariety={riceVariety}
+                setRiceVariety={setRiceVariety}
+                inputRef={sessionNameRef}
+                apiError={apiError}
+                creating={creating}
+                onStart={handleStart}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

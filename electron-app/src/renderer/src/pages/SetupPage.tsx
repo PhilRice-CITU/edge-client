@@ -58,7 +58,7 @@ export function SetupPage() {
 
   if (view === 'registered' && result) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-8 p-8">
+      <div className="flex h-full flex-col items-center justify-center gap-8 p-8 max-w-110 mx-auto w-full">
         <div className="flex flex-col items-center gap-2 text-center">
           <CheckCircle size={48} className="text-primary" />
           <h1 className="text-2xl font-bold text-foreground">Device Ready</h1>
@@ -85,8 +85,8 @@ export function SetupPage() {
 
   if (view === 'claim') {
     return (
-      <div className="flex h-full flex-col justify-between p-8">
-        <div className="flex flex-col gap-2">
+      <div className="flex h-full flex-col gap-8 p-6 max-w-110 mx-auto w-full">
+        <div className="flex flex-col gap-2 pt-2">
           <button
             onClick={() => {
               setView('pick-region')
@@ -101,7 +101,7 @@ export function SetupPage() {
             Enter the device ID shown on the original QR screen or paste the UUID.
           </p>
         </div>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-1 flex-col justify-center gap-4">
           <input
             className="w-full rounded-xl border border-border bg-input px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="e.g. 3f2504e0-4f89-11d3-9a0c-0305e82c3301"
@@ -133,8 +133,8 @@ export function SetupPage() {
   }
 
   return (
-    <div className="flex h-full flex-col justify-between p-8">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="flex h-full flex-col gap-6 p-6 max-w-110 mx-auto w-full">
+      <div className="flex flex-col items-center gap-3 text-center pt-2">
         <AnimatedLogo size={48} animate={false} />
         <h1 className="text-2xl font-bold text-foreground">Select Your Region</h1>
         <p className="text-sm text-muted-foreground">
@@ -142,7 +142,7 @@ export function SetupPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 overflow-y-auto py-4">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto py-2">
         <input
           className="w-full rounded-xl border border-border bg-input px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           placeholder="Provision token (required)"

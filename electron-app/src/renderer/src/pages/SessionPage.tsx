@@ -90,16 +90,16 @@ export function SessionPage() {
     <div className="flex h-full flex-col">
       {/* ── Scrollable content ───────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6 pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           <button
             onClick={() => navigate({ to: '/home' })}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← Back
           </button>
           <div className="flex flex-col items-end">
             {session?.session_name && (
-              <span className="text-sm font-medium text-foreground">{session.session_name}</span>
+              <span className="text-base font-semibold text-foreground">{session.session_name}</span>
             )}
             <span className="text-xs text-muted-foreground">
               {batchCount} batch{batchCount !== 1 ? 'es' : ''} captured
@@ -107,20 +107,20 @@ export function SessionPage() {
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4">
           <CameraPreview
             paused={capture.isPending}
             overlayLabel={capture.isPending ? 'Capturing…' : null}
           />
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4">
           <BatchGallery batches={session?.batches ?? []} />
         </div>
       </div>
 
       {/* ── Sticky bottom actions ────────────────────────────────── */}
-      <div className="shrink-0 border-t border-border bg-background px-6 py-4">
+      <div className="shrink-0 border-t border-border bg-background px-5 py-3">
         <div className="flex flex-col gap-2">
           <CaptureButton onCapture={handleCapture} isCapturing={capture.isPending} />
           {captureError && (
