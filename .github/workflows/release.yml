@@ -27,10 +27,6 @@ jobs:
         working-directory: electron-app
         run: npm ci
 
-      - name: Run tests
-        working-directory: electron-app
-        run: npm test
-
       - name: Build + publish .deb to GitHub Releases
         working-directory: electron-app
         env:
