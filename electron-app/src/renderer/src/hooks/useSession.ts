@@ -38,7 +38,14 @@ export function useCreateSession() {
         headers: { ...edgeHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
       })
-      if (!response.ok) throw new Error('Failed to create session')
+      if (!response.ok) {
+        let detail = `Server error ${response.status}`
+        try {
+          const payload = await response.json() as { error?: string; detail?: string }
+          detail = payload.detail ?? payload.error ?? detail
+        } catch { /* ignore */ }
+        throw new Error(detail)
+      }
       return response.json() as Promise<Session>
     },
     onSuccess: (data) => {

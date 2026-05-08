@@ -20,9 +20,25 @@ npm test                # Vitest
 npm run test:watch
 npm run test:coverage
 
-# --- Build .deb for Pi ---
+# --- Build .deb for Pi (local, no CI) ---
 cd electron-app
 npm run package:deb     # outputs arm64 .deb to dist/
+
+# --- Release (triggers CI → builds .deb → publishes GitHub Release → Pi auto-updates) ---
+cd electron-app
+npm run release:patch   # bumps patch (1.0.x → 1.0.x+1), commits, tags, pushes
+npm run release:minor   # bumps minor
+npm run release:major   # bumps major
+
+# IMPORTANT: always run release:* from electron-app/, NOT from repo root.
+# The script (scripts/release.sh) handles committing and tagging from the repo root automatically.
+# Do NOT use `npm version patch` directly — it won't create the git tag correctly in this monorepo layout.
+
+# --- Manual Pi install (when auto-update hasn't fired yet) ---
+# On Mac:
+scp electron-app/dist/hum-ai_<version>_arm64.deb humai@raspberrypi:~/
+# On Pi:
+sudo dpkg -i ~/hum-ai_<version>_arm64.deb
 
 # --- MQTT agent (Pi only) ---
 python3 -m venv .venv && source .venv/bin/activate

@@ -41,7 +41,7 @@ export function HomePage() {
   const [operatorName, setOperatorName] = useState(() => localStorage.getItem(OPERATOR_KEY) ?? '')
   const [sessionName, setSessionName] = useState('')
   const [riceVariety, setRiceVariety] = useState('')
-  const [apiError, setApiError] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
@@ -84,7 +84,7 @@ export function HomePage() {
   }, [wizard])
 
   const openWizard = () => {
-    setApiError(false)
+    setApiError(null)
     setSessionName('')
     setRiceVariety('')
     setWizard('step1')
@@ -110,13 +110,13 @@ export function HomePage() {
 
   const closeWizard = () => {
     setWizard('closed')
-    setApiError(false)
+    setApiError(null)
   }
 
   const handleStart = async () => {
     if (creating || !sessionName.trim()) return
     setCreating(true)
-    setApiError(false)
+    setApiError(null)
     const trimmedOperator = operatorName.trim()
     if (trimmedOperator) localStorage.setItem(OPERATOR_KEY, trimmedOperator)
     const variety = riceVariety.trim() ? formatRiceVariety(riceVariety.trim()) : null
@@ -134,8 +134,10 @@ export function HomePage() {
       }
       sessionStorage.setItem(WIZARD_DRAFT_KEY, JSON.stringify(draft))
       navigate({ to: '/session/$sessionId', params: { sessionId: session.id } })
-    } catch {
-      setApiError(true)
+    } catch (err) {
+      console.error('[handleStart] createSession failed:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setApiError(msg || 'Unknown error')
     } finally {
       setCreating(false)
     }
@@ -360,7 +362,7 @@ function Step2({
   riceVariety: string
   setRiceVariety: (v: string) => void
   inputRef: React.RefObject<HTMLInputElement | null>
-  apiError: boolean
+  apiError: string | null
   creating: boolean
   onStart: () => void
 }) {
@@ -422,7 +424,7 @@ function Step2({
 
         {apiError && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Cannot reach the server. Check connection and API_BASE_URL in settings.
+            {apiError}
           </p>
         )}
       </div>
