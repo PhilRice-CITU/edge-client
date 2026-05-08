@@ -35,6 +35,7 @@ const mockSession: Session = {
   id: 'sess-123',
   mode: 'grade',
   operator_name: '',
+  session_name: null,
   rice_variety: null,
   status: 'capturing',
   batches: [],

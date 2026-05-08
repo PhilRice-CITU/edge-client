@@ -16,6 +16,7 @@ const mockSession: Session = {
   id: 'sess-abc',
   mode: 'grade',
   operator_name: 'Juan',
+  session_name: null,
   rice_variety: null,
   status: 'capturing',
   batches: [{ batch_number: 1, ir_path: '/tmp/ir.jpg', white_path: '/tmp/white.jpg', captured_at: '2026-01-01T00:00:00Z' }],
@@ -30,7 +31,7 @@ describe('useCapture', () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(mockSession), { status: 200 }),
     )
-    const { result } = renderHook(() => useCapture('sess-abc'), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useCapture('sess-abc', 0), { wrapper: makeWrapper() })
     let returned: typeof mockSession | undefined
     await act(async () => {
       returned = await result.current.mutateAsync()
@@ -43,7 +44,7 @@ describe('useCapture', () => {
 
   it('sets isError on capture failure', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 503 }))
-    const { result } = renderHook(() => useCapture('sess-abc'), { wrapper: makeWrapper() })
+    const { result } = renderHook(() => useCapture('sess-abc', 0), { wrapper: makeWrapper() })
     await act(async () => {
       result.current.mutate()
     })
@@ -58,7 +59,7 @@ describe('useCapture', () => {
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     )
-    const { result } = renderHook(() => useCapture('sess-abc'), { wrapper })
+    const { result } = renderHook(() => useCapture('sess-abc', 0), { wrapper })
     await act(async () => {
       await result.current.mutateAsync()
     })

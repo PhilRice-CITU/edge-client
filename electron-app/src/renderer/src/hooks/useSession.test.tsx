@@ -16,6 +16,7 @@ const mockSession: Session = {
   id: 'sess-abc',
   mode: 'grade',
   operator_name: 'Juan',
+  session_name: null,
   rice_variety: 'Sinandomeng',
   status: 'capturing',
   batches: [],
@@ -52,6 +53,7 @@ describe('useCreateSession', () => {
       returned = await result.current.mutateAsync({
         mode: 'grade',
         operator_name: 'Juan',
+        session_name: null,
         rice_variety: 'Sinandomeng',
       })
     })
@@ -65,7 +67,7 @@ describe('useCreateSession', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 500 }))
     const { result } = renderHook(() => useCreateSession(), { wrapper: makeWrapper() })
     await act(async () => {
-      await result.current.mutate({ mode: 'grade', operator_name: 'X', rice_variety: null })
+      await result.current.mutate({ mode: 'grade', operator_name: 'X', session_name: null, rice_variety: null })
     })
     await waitFor(() => expect(result.current.isError).toBe(true))
   })
