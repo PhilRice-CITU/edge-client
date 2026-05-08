@@ -2,14 +2,12 @@
 // Call initDeviceConfig() once at app startup (e.g. in main.tsx) before any hooks fire.
 
 let _deviceId = ''
-let _deviceSecret = ''
 let _apiBaseUrl = ''
 let _ready = false
 
 export async function initDeviceConfig(): Promise<void> {
   if (_ready) return
   _deviceId = await window.api.getDeviceId()
-  _deviceSecret = await window.api.getDeviceSecret()
   _apiBaseUrl = (await window.api.getApiBaseUrl()).replace(/\/$/, '')
   _ready = true
 }
@@ -17,7 +15,6 @@ export async function initDeviceConfig(): Promise<void> {
 export function edgeHeaders(): HeadersInit {
   return {
     'X-Device-ID': _deviceId,
-    'X-Device-Secret': _deviceSecret,
   }
 }
 
