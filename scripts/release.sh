@@ -16,7 +16,8 @@ cd "$REPO_ROOT"
 git add electron-app/package.json electron-app/package-lock.json
 git commit -m "$VERSION"
 git tag "v$VERSION"
-git push --follow-tags
+git push origin main
+git push origin "v$VERSION"
 
 echo ""
 echo "Released v$VERSION — CI is building the .deb now."
