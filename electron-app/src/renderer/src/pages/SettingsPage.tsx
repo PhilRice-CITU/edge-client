@@ -7,6 +7,8 @@ import { useDeviceStatus } from '@renderer/hooks/useDeviceStatus'
 import { cn } from '@renderer/lib/utils'
 
 interface ConfigFields {
+  DEVICE_ID: string
+  DEVICE_SECRET: string
   API_BASE_URL: string
   MQTT_HOST: string
   MQTT_PORT: string
@@ -18,6 +20,8 @@ interface ConfigFields {
 }
 
 const DEFAULT_CONFIG: ConfigFields = {
+  DEVICE_ID: '',
+  DEVICE_SECRET: '',
   API_BASE_URL: '',
   MQTT_HOST: '',
   MQTT_PORT: '1883',
@@ -161,6 +165,19 @@ export function SettingsPage() {
 
           {configExpanded && (
             <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+              <ConfigField
+                label="Device ID"
+                value={config.DEVICE_ID}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                onChange={(v) => handleFieldChange('DEVICE_ID', v)}
+              />
+              <ConfigField
+                label="Device Secret"
+                value={config.DEVICE_SECRET}
+                placeholder="your-device-secret"
+                type="password"
+                onChange={(v) => handleFieldChange('DEVICE_SECRET', v)}
+              />
               <ConfigField
                 label="API Base URL"
                 value={config.API_BASE_URL}

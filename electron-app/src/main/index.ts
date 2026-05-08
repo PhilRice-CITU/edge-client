@@ -186,6 +186,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-config', () => {
     const cfg = getConfig()
     return {
+      DEVICE_ID: cfg.DEVICE_ID,
+      DEVICE_SECRET: cfg.DEVICE_SECRET,
       API_BASE_URL: cfg.API_BASE_URL,
       MQTT_HOST: cfg.MQTT_HOST,
       MQTT_PORT: String(cfg.MQTT_PORT),
