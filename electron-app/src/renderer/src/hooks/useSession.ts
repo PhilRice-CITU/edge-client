@@ -80,11 +80,13 @@ export function useSubmitSession(sessionId: string, batches: Session['batches'] 
     mutationFn: async () => {
       const form = new FormData()
 
+      console.log(`[submit] batches count: ${batches.length}`, batches.map(b => b.batch_number))
       for (const batch of batches) {
         const [irResp, whiteResp] = await Promise.all([
           fetch(`local-image://${batch.ir_path}`),
           fetch(`local-image://${batch.white_path}`),
         ])
+        console.log(`[submit] batch ${batch.batch_number}: ir=${irResp.status} white=${whiteResp.status}`)
         if (!irResp.ok || !whiteResp.ok) throw new Error(`Batch ${batch.batch_number} images missing`)
         form.append('ir_images', await irResp.blob(), `ir_${batch.batch_number}.jpg`)
         form.append('raw_images', await whiteResp.blob(), `raw_${batch.batch_number}.jpg`)
@@ -95,8 +97,15 @@ export function useSubmitSession(sessionId: string, batches: Session['batches'] 
         headers: edgeHeaders(),
         body: form,
       })
-      if (!response.ok) throw new Error('Failed to submit session')
-      return response.json() as Promise<{ result_id: string }>
+      if (!response.ok) {
+        let detail = `Server error ${response.status}`
+        try {
+          const payload = await response.json() as { error?: string; detail?: string }
+          detail = payload.detail ?? payload.error ?? detail
+        } catch { /* ignore */ }
+        throw new Error(detail)
+      }
+      return response.json() as Promise<{ result_ids: string[] }>
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', sessionId] })

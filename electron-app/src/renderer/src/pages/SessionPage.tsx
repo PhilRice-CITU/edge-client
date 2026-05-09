@@ -52,8 +52,9 @@ export function SessionPage() {
       await submitSession.mutateAsync()
       setSubmitting(false)
       setUploadSent(true)
-    } catch {
-      setSubmitError('Upload failed. Check your connection and try again.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setSubmitError(`Upload failed: ${msg}`)
       setSubmitting(false)
     }
   }

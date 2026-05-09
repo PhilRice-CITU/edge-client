@@ -93,14 +93,14 @@ describe('useUpdateSession', () => {
 describe('useSubmitSession', () => {
   it('POSTs to /sessions/:id/submit', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ result_id: 'res-xyz' }), { status: 200 }),
+      new Response(JSON.stringify({ result_ids: ['res-xyz'] }), { status: 200 }),
     )
     const { result } = renderHook(() => useSubmitSession('sess-abc'), { wrapper: makeWrapper() })
-    let returned: { result_id: string } | undefined
+    let returned: { result_ids: string[] } | undefined
     await act(async () => {
       returned = await result.current.mutateAsync()
     })
-    expect(returned?.result_id).toBe('res-xyz')
+    expect(returned?.result_ids).toContain('res-xyz')
     const call = vi.mocked(fetch).mock.calls[0]
     expect(call[0]).toContain('/sessions/sess-abc/submit')
     expect(call[1]?.method).toBe('POST')
