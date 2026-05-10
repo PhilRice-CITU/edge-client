@@ -7,10 +7,6 @@ import { config as dotenvConfig } from 'dotenv'
 // which doesn't match the Hum.ai path seeded by after-install.sh.
 app.setPath('userData', join(app.getPath('appData'), 'Hum.ai'))
 
-export const PYTHON_ROOT = app.isPackaged
-  ? join(process.resourcesPath, 'python', 'src')
-  : resolve(__dirname, '..', '..', '..', 'src')
-
 export const SCRIPTS_ROOT = app.isPackaged
   ? join(process.resourcesPath, 'python', 'scripts')
   : resolve(__dirname, '..', '..', '..', 'scripts')
@@ -44,9 +40,6 @@ export interface EdgeConfig {
   ROBOFLOW_WORKSPACE: string
   ROBOFLOW_PROJECT_NORMAL: string
   ROBOFLOW_PROJECT_IR: string
-
-  MQTT_HOST: string
-  MQTT_PORT: number
 }
 
 let _config: EdgeConfig | null = null
@@ -71,8 +64,6 @@ export function loadEnv(): void {
   d('PRODUCTION_UPLOAD_TARGET', 'api')
   d('TRAINING_UPLOAD_TARGET', 'roboflow')
   d('API_TIMEOUT_SECONDS', '30')
-  d('MQTT_HOST', 'localhost')
-  d('MQTT_PORT', '1883')
   d('ROBOFLOW_API_KEY', '')
   d('ROBOFLOW_WORKSPACE', '')
   d('ROBOFLOW_PROJECT_NORMAL', '')
@@ -99,9 +90,6 @@ export function loadEnv(): void {
     ROBOFLOW_WORKSPACE: env['ROBOFLOW_WORKSPACE']!,
     ROBOFLOW_PROJECT_NORMAL: env['ROBOFLOW_PROJECT_NORMAL']!,
     ROBOFLOW_PROJECT_IR: env['ROBOFLOW_PROJECT_IR']!,
-
-    MQTT_HOST: env['MQTT_HOST']!,
-    MQTT_PORT: parseInt(env['MQTT_PORT']!, 10),
   }
 
   console.log(

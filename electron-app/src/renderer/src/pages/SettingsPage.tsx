@@ -10,8 +10,6 @@ interface ConfigFields {
   DEVICE_ID: string
   DEVICE_SECRET: string
   API_BASE_URL: string
-  MQTT_HOST: string
-  MQTT_PORT: string
   EDGE_MODE: string
   ROBOFLOW_API_KEY: string
   ROBOFLOW_WORKSPACE: string
@@ -23,8 +21,6 @@ const DEFAULT_CONFIG: ConfigFields = {
   DEVICE_ID: '',
   DEVICE_SECRET: '',
   API_BASE_URL: '',
-  MQTT_HOST: '',
-  MQTT_PORT: '1883',
   EDGE_MODE: 'production',
   ROBOFLOW_API_KEY: '',
   ROBOFLOW_WORKSPACE: '',
@@ -183,18 +179,6 @@ export function SettingsPage() {
                 value={config.API_BASE_URL}
                 placeholder="https://your-api-server.com"
                 onChange={(v) => handleFieldChange('API_BASE_URL', v)}
-              />
-              <ConfigField
-                label="MQTT Host"
-                value={config.MQTT_HOST}
-                placeholder="broker.hivemq.com"
-                onChange={(v) => handleFieldChange('MQTT_HOST', v)}
-              />
-              <ConfigField
-                label="MQTT Port"
-                value={config.MQTT_PORT}
-                placeholder="1883"
-                onChange={(v) => handleFieldChange('MQTT_PORT', v)}
               />
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-muted-foreground">Edge Mode</label>

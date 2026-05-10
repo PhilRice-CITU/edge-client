@@ -94,25 +94,11 @@
     },
     "extraResources": [
       {
-        "from": "../src",
-        "to": "python/src",
-        "filter": [
-          "mqtt_agent.py",
-          "commands.py",
-          "event_client.py",
-          "training_uploader.py"
-        ]
-      },
-      {
         "from": "../scripts",
         "to": "python/scripts",
         "filter": [
           "*.sh"
         ]
-      },
-      {
-        "from": "../requirements.txt",
-        "to": "python/requirements.txt"
       },
       {
         "from": "../.env.example",

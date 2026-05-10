@@ -6,8 +6,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 
-import { loadEnv, getConfig, ENV_PATH, PYTHON_ROOT, DATA_ROOT, SCRIPTS_ROOT } from './env'
-import { spawnSidecar, shutdownAll } from './sidecar'
+import { loadEnv, getConfig, ENV_PATH, DATA_ROOT, SCRIPTS_ROOT } from './env'
+import { shutdownAll } from './sidecar'
 import { startGpioPoller, stopGpioPoller, setGpioMode } from './gpio'
 
 // Must be called before app.whenReady() — registers the custom protocol
@@ -189,8 +189,6 @@ app.whenReady().then(async () => {
       DEVICE_ID: cfg.DEVICE_ID,
       DEVICE_SECRET: cfg.DEVICE_SECRET,
       API_BASE_URL: cfg.API_BASE_URL,
-      MQTT_HOST: cfg.MQTT_HOST,
-      MQTT_PORT: String(cfg.MQTT_PORT),
       EDGE_MODE: cfg.EDGE_MODE,
       ROBOFLOW_API_KEY: cfg.ROBOFLOW_API_KEY,
       ROBOFLOW_WORKSPACE: cfg.ROBOFLOW_WORKSPACE,
@@ -206,13 +204,6 @@ app.whenReady().then(async () => {
       setGpioMode(mode)
     }
   })
-
-  // ── Sidecars ────────────────────────────────────────────────────────────────
-
-  // Flask is gone — only the MQTT agent runs as a sidecar
-  console.log('[main] Starting Python sidecar...')
-  spawnSidecar('mqtt-agent', join(PYTHON_ROOT, 'mqtt_agent.py'))
-  console.log('[main] Sidecar started')
 
   // ── Window ──────────────────────────────────────────────────────────────────
 
