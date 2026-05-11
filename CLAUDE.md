@@ -40,12 +40,6 @@ scp electron-app/dist/hum-ai_<version>_arm64.deb humai@raspberrypi:~/
 # On Pi:
 sudo dpkg -i ~/hum-ai_<version>_arm64.deb
 
-# --- MQTT agent (Pi only) ---
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env    # set DEVICE_ID, DEVICE_SECRET, API_BASE_URL
-python3 src/mqtt_agent.py
-
 # --- Pi deployment ---
 ./setup.sh              # one-time: apt, venv, npm build, systemd unit install
 sudo systemctl start rice-vision
@@ -57,19 +51,14 @@ journalctl -u rice-vision -f
 ## Architecture
 
 ```
-LAYER 2: Electron (electron-app/)          ← touchscreen kiosk UI
+Electron (electron-app/)          ← touchscreen kiosk UI
   React 19 + TanStack Router + TanStack Query
   Talks directly to cloud api-server at /edge/v1/...
   Calls capture.sh via IPC for image capture
   Uses local-image:// custom protocol to display local JPEGs
-
-LAYER 1: Python MQTT agent (src/mqtt_agent.py)  ← telemetry + preview
-  Publishes device telemetry to cloud via MQTT
-  Embeds a preview HTTP server on port 5056 (no Flask)
-  training_uploader.py: uploads training images to Roboflow
 ```
 
-Flask has been removed. Electron is now a thin client — it talks directly to the cloud `api-server` at `/edge/v1/...` using `X-Device-ID` + `X-Device-Secret` headers. The only local Python process is the MQTT agent.
+Electron is a thin client — it talks directly to the cloud `api-server` at `/edge/v1/...` using `X-Device-ID` + `X-Device-Secret` headers. No local Python sidecar runs on the Pi; the only Python on the device is the bash-invoked `capture.sh` plus standalone training scripts under `scripts/`.
 
 ## Data Flow
 
@@ -88,8 +77,6 @@ Each Pi has `DEVICE_ID` and `DEVICE_SECRET` in its `.env`. These are set during 
 
 | File | Role |
 |------|------|
-| `src/mqtt_agent.py` | MQTT telemetry agent + embedded preview HTTP server (port 5056) |
-| `src/training_uploader.py` | Roboflow image upload (used by mqtt_agent in training mode) |
 | `scripts/capture.sh` | GPIO relay control + `rpicam-still` dual capture |
 | `electron-app/src/main/index.ts` | Electron main — IPC handlers, local-image:// protocol, auto-updater |
 | `electron-app/src/renderer/src/lib/api.ts` | Cloud API helpers: `apiUrl()`, `edgeHeaders()`, `initDeviceConfig()` |
@@ -101,7 +88,6 @@ Each Pi has `DEVICE_ID` and `DEVICE_SECRET` in its `.env`. These are set during 
 | `DEVICE_ID` | UUID identifying this Pi to the cloud api-server |
 | `DEVICE_SECRET` | Secret for authenticating edge API requests |
 | `API_BASE_URL` | Cloud api-server URL (e.g. `https://api.example.com`) |
-| `MQTT_BROKER_URL` | MQTT broker for telemetry |
 | `ROBOFLOW_API_KEY` | Roboflow key for training uploads |
 | `ROBOFLOW_WORKSPACE` | Roboflow workspace slug |
 | `ROBOFLOW_PROJECT_NORMAL` | Roboflow project for white-LED images |

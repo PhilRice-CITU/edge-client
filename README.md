@@ -27,9 +27,9 @@ Operator                Pi (this repo)               Cloud
 ```
 
 There is **no Flask server** on the Pi anymore. The Electron app is a thin
-client that talks directly to `https://hum-ai-api.onrender.com`. The only
-Python process on the Pi is `mqtt_agent.py` for telemetry + a tiny embedded
-preview HTTP server on port 5056.
+client that talks directly to `https://hum-ai-api.onrender.com`. No Python
+sidecar runs on the Pi — only bash-invoked `capture.sh` and standalone
+training scripts.
 
 ---
 
@@ -42,16 +42,11 @@ edge-client/
 │   ├── src/preload/           ← contextBridge IPC surface
 │   ├── src/renderer/src/      ← React UI (atomic design)
 │   └── electron-builder.yml   ← .deb packaging + GitHub Releases publish config
-├── src/                       ← Pi-side Python
-│   ├── mqtt_agent.py          ← MQTT telemetry + preview HTTP server (port 5056)
-│   ├── training_uploader.py   ← Roboflow upload helper
-│   ├── commands.py            ← MQTT command handlers
-│   └── event_client.py        ← Event log forwarding
 ├── scripts/
 │   ├── capture.sh             ← rpicam-still IR + white LED dual capture
-│   └── after-install.sh       ← .deb postinstall (Python deps, .env, autostart)
+│   └── after-install.sh       ← .deb postinstall (.env seed, autostart)
 ├── .env.example               ← Shipped inside .deb, copied to ~/.config/Hum.ai/.env
-├── requirements.txt           ← paho-mqtt, requests
+├── requirements.txt           ← requests (only used by standalone scripts)
 └── setup.sh                   ← One-time dev setup (apt + npm install + .env)
 ```
 
@@ -86,7 +81,7 @@ sudo reboot
 ```
 
 What the postinstall does, in order:
-1. `pip3 install -r requirements.txt` — installs `paho-mqtt`, `requests`
+1. `pip3 install -r requirements.txt` — installs `requests`
 2. Copies the shipped `env.example` → `~/.config/Hum.ai/.env` (only if no `.env` exists yet — your existing one is preserved on upgrade)
 3. Drops a `~/.config/autostart/hum-ai.desktop` entry so the kiosk launches on login
 4. Future updates: just install the new `.deb`, no reconfiguration
@@ -182,7 +177,6 @@ working device:
 | `DEVICE_SECRET` | Auto-set by SetupPage | Auth header for `/edge/v1/...` |
 | `PROVISION_TOKEN` | Operator types into SetupPage | Shared admin secret |
 | `REGION_CODE` | Operator picks in SetupPage | Region this Pi belongs to |
-| `MQTT_HOST` / `MQTT_PORT` | Pre-filled | Telemetry broker |
 
 Roboflow keys (`ROBOFLOW_*`) are only needed if the Pi uploads training
 images directly. The api-server has its own copies for forwarded uploads —
@@ -198,7 +192,6 @@ the production flow doesn't need them on the Pi.
 | "Cannot reach the server" on Home | Pi has no internet, or api-server is down | Check `curl https://hum-ai-api.onrender.com/edge/v1/devices/regions` |
 | Capture button does nothing | Not on Pi hardware, or `capture.sh` permissions | `chmod +x scripts/capture.sh` and check `journalctl -u hum-ai` |
 | Auto-updates never trigger | `publish.owner`/`repo` still placeholder, or no release published | Set them in `electron-builder.yml` and run `npm run build:publish` |
-| MQTT telemetry missing in dashboard | `mqtt_agent.py` not running | `journalctl -u hum-ai-mqtt -f` (or check the sidecar logs in Electron) |
 
 Logs:
 ```bash
