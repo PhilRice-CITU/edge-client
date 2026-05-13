@@ -1,6 +1,6 @@
 {
   "name": "hum-ai",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "Hum.ai",
   "main": "./out/main/index.js",
   "author": {
