@@ -14,6 +14,12 @@ declare global {
       deleteFiles: (paths: string[]) => Promise<void>
       saveConfig: (fields: Record<string, string>) => Promise<{ ok: boolean; error?: string }>
       getConfig: () => Promise<Record<string, string>>
+      getRoboflowConfig: () => Promise<{
+        apiKey: string
+        workspace: string
+        projectNormal: string
+        projectIr: string
+      }>
       onGpioButtonPressed: (cb: () => void) => () => void
       setGpioMode: (mode: 'training' | 'session' | 'idle') => void
       onUpdateAvailable: (cb: (version: string) => void) => () => void

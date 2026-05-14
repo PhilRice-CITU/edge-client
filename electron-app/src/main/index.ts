@@ -155,6 +155,13 @@ app.whenReady().then(async () => {
     })
   })
 
+  ipcMain.handle('get-roboflow-config', () => ({
+    apiKey: config.ROBOFLOW_API_KEY,
+    workspace: config.ROBOFLOW_WORKSPACE,
+    projectNormal: config.ROBOFLOW_PROJECT_NORMAL,
+    projectIr: config.ROBOFLOW_PROJECT_IR,
+  }))
+
   ipcMain.handle('delete-files', (_, paths: string[]) => {
     for (const p of paths) {
       if (p.startsWith(config.IMAGE_DIR) && existsSync(p)) {

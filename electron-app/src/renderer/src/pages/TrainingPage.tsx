@@ -4,7 +4,6 @@ import { useGpioButton } from '@renderer/hooks/useGpioButton'
 import { KioskButton } from '@renderer/components/molecules/KioskButton'
 import { CameraPreview } from '@renderer/components/molecules/CameraPreview'
 import { CheckCircle2, Loader2, UploadCloud } from 'lucide-react'
-import { apiUrl, getDeviceId } from '@renderer/lib/api'
 
 type CaptureState = 'idle' | 'capturing' | 'uploading' | 'done' | 'error'
 
@@ -38,31 +37,36 @@ export function TrainingPage() {
 
       setPhase('uploading')
 
-      // Step 2: upload to Roboflow via cloud edge endpoint, then delete from disk
+      // Step 2: upload directly to Roboflow (no api-server), then delete from disk
       let uploadOk = false
       try {
-        const form = new FormData()
+        const rf = await window.api.getRoboflowConfig()
+        if (!rf.apiKey || !rf.projectNormal || !rf.projectIr) {
+          throw new Error('Roboflow credentials not configured — check .env on this device')
+        }
+
         const [irResp, whiteResp] = await Promise.all([
           fetch(`local-image://${ir_path}`),
           fetch(`local-image://${white_path}`),
         ])
         if (!irResp.ok || !whiteResp.ok) throw new Error('Could not read captured images from disk')
-        form.append('ir', await irResp.blob(), 'ir.jpg')
-        form.append('raw', await whiteResp.blob(), 'raw.jpg')
+        const [irBlob, whiteBlob] = await Promise.all([irResp.blob(), whiteResp.blob()])
 
-        const deviceId = getDeviceId()
-        if (!deviceId) {
-          throw new Error('Device not provisioned — go to Setup to register this device')
+        const uploadToRoboflow = async (blob: Blob, project: string, filename: string): Promise<void> => {
+          const form = new FormData()
+          form.append('file', blob, filename)
+          const url = `https://api.roboflow.com/dataset/${project}/upload?api_key=${rf.apiKey}&name=${filename}&split=train`
+          const res = await fetch(url, { method: 'POST', body: form })
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string }
+            throw new Error(body.error ?? `Roboflow upload failed (${res.status})`)
+          }
         }
-        const res = await fetch(apiUrl(`/devices/${deviceId}/upload-training`), {
-          method: 'POST',
-          body: form,
-        })
 
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-          throw new Error(body.detail ?? body.error ?? 'Upload failed')
-        }
+        await Promise.all([
+          uploadToRoboflow(whiteBlob, rf.projectNormal, `white_${newCount}.jpg`),
+          uploadToRoboflow(irBlob, rf.projectIr, `ir_${newCount}.jpg`),
+        ])
 
         uploadOk = true
       } finally {

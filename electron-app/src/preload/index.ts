@@ -22,6 +22,13 @@ const api = {
 
   getConfig: (): Promise<Record<string, string>> => ipcRenderer.invoke('get-config'),
 
+  getRoboflowConfig: (): Promise<{
+    apiKey: string
+    workspace: string
+    projectNormal: string
+    projectIr: string
+  }> => ipcRenderer.invoke('get-roboflow-config'),
+
   onGpioButtonPressed: (cb: () => void): (() => void) => {
     const handler = (): void => cb()
     ipcRenderer.on('gpio:button-pressed', handler)
