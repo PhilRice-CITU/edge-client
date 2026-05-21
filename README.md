@@ -119,7 +119,7 @@ Your `.env` is preserved across upgrades.
 After install, the kiosk launches with an empty `DEVICE_ID` and routes to
 the **Setup** screen:
 
-1. Operator picks a region and enters the `PROVISION_TOKEN` (from the admin).
+1. Operator picks a region.
 2. The app calls `POST /edge/v1/devices/provision` on the api-server.
 3. The cloud returns a `device_id` + `device_secret`.
 4. The app writes both to `~/.config/Hum.ai/.env` via the preload `saveConfig` IPC.
@@ -175,7 +175,6 @@ working device:
 | `API_BASE_URL` | Pre-filled in `.env.example` | Cloud api-server URL |
 | `DEVICE_ID` | Auto-set by SetupPage | UUID identifying this Pi |
 | `DEVICE_SECRET` | Auto-set by SetupPage | Auth header for `/edge/v1/...` |
-| `PROVISION_TOKEN` | Operator types into SetupPage | Shared admin secret |
 | `REGION_CODE` | Operator picks in SetupPage | Region this Pi belongs to |
 
 Roboflow keys (`ROBOFLOW_*`) are only needed if the Pi uploads training

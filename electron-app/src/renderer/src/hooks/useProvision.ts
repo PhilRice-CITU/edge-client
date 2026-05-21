@@ -2,6 +2,22 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiUrl } from '@renderer/lib/api'
 import type { Region } from '@renderer/types/session'
 
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: unknown }
+  if (typeof err.detail === 'string') return err.detail
+  if (Array.isArray(err.detail)) {
+    return err.detail
+      .map((e) =>
+        e && typeof e === 'object' && 'msg' in e
+          ? `${(e as { loc?: unknown[] }).loc?.slice(-1)[0] ?? 'request'}: ${String((e as { msg: unknown }).msg)}`
+          : String(e),
+      )
+      .join('; ')
+  }
+  if (typeof err.error === 'string') return err.error
+  return fallback
+}
+
 interface RegisterResult {
   device_id: string
   display_name: string
@@ -27,16 +43,15 @@ export function useRegions() {
 }
 
 export function useRegisterDevice() {
-  return useMutation<RegisterResult, Error, { region_code: string; provision_token: string }>({
-    mutationFn: async ({ region_code, provision_token }) => {
+  return useMutation<RegisterResult, Error, { region_code: string }>({
+    mutationFn: async ({ region_code }) => {
       const res = await fetch(apiUrl('/devices/provision'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ region_code, provision_token }),
+        body: JSON.stringify({ region_code }),
       })
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-        throw new Error(err.detail ?? err.error ?? 'Registration failed')
+        throw new Error(await parseErrorMessage(res, 'Registration failed'))
       }
       const data = (await res.json()) as RegisterResult
       // Persist device identity (including the new secret) to .env
@@ -60,8 +75,7 @@ export function useClaimDevice() {
         body: JSON.stringify({ device_id }),
       })
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-        throw new Error(err.detail ?? err.error ?? 'Claim failed')
+        throw new Error(await parseErrorMessage(res, 'Claim failed'))
       }
       const data = (await res.json()) as ClaimResult
       await window.api.saveConfig({
